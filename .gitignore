@@ -1,0 +1,55 @@
+# ------------------------------------------------------------------
+# Entorno y basura de Python
+# ------------------------------------------------------------------
+.pucp-project/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.env
+
+# ------------------------------------------------------------------
+# Pesos y datos: nada de esto va al repositorio
+# ------------------------------------------------------------------
+# Modelos entrenados y checkpoints base (yolov8*-seg.pt)
+*.pt
+# Cache de anotaciones de Ultralytics (dataset/labels.cache)
+*.cache
+# Salida cruda de los entrenamientos
+runs/
+
+# Dataset completo (366 MB de imágenes + anotaciones).
+# Se conserva solo data.yaml, que define las 7 clases y lo lee config.py.
+dataset/*
+!dataset/data.yaml
+
+# ------------------------------------------------------------------
+# Imágenes: todas se regeneran con los comandos del proyecto
+# ------------------------------------------------------------------
+# benchmark_results/  -> `benchmark` (74 MB de JPEG de predicciones)
+# confusion_matrices/ -> `matrices`
+# models/history/     -> curvas y matrices que copia `train`
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.webp
+*.tif
+*.tiff
+
+# ------------------------------------------------------------------
+# Lo que sí se sube de las carpetas de resultados
+# ------------------------------------------------------------------
+# benchmark_results/*.xlsx  tabla comparativa
+# models/models.csv         el registro (leaderboard de 5)
+# models/history/*/         results.csv y args.yaml de cada entrenamiento
+
+# ------------------------------------------------------------------
+# Sistema operativo y editores
+# ------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

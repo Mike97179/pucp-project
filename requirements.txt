@@ -1,0 +1,9 @@
+# Verificado con Python 3.10.20.
+#
+# ultralytics arrastra torch, opencv, matplotlib, numpy y pyyaml, que es todo
+# lo demás que importa el software. Para GPU, instala antes el torch que
+# corresponda a tu CUDA desde https://pytorch.org (aquí: 2.12.0+cu130); si no,
+# se instala la versión CPU y todo funciona igual pero lento.
+ultralytics==8.4.61
+pandas==2.3.3
+openpyxl==3.1.5

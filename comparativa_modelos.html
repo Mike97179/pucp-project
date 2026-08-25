@@ -1,0 +1,487 @@
+<title>Auditoría de Modelos YOLO-seg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root{
+    --bg:#EDEFEF; --surface:#FFFFFF; --surface-2:#F6F8F8;
+    --ink:#15181A; --ink-2:#596265; --ink-3:#8C9698;
+    --line:#D6DBDB; --line-strong:#BAC2C2;
+    --accent:#0E6B77; --accent-soft:#0E6B7722; --accent-ink:#0A505A;
+    --good:#2F6E4F; --good-soft:#2F6E4F1F;
+    --warn:#8A6612; --warn-soft:#8A66121F;
+    --bad:#9E4126;  --bad-soft:#9E41261F;
+    --shadow:0 1px 2px rgba(20,30,32,.05), 0 8px 24px -16px rgba(20,30,32,.28);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1214; --surface:#161B1E; --surface-2:#1C2225;
+      --ink:#E7EBEB; --ink-2:#98A4A7; --ink-3:#6C7779;
+      --line:#272F33; --line-strong:#3A4448;
+      --accent:#54C6D2; --accent-soft:#54C6D226; --accent-ink:#8FDCE4;
+      --good:#74C295; --good-soft:#74C29522;
+      --warn:#D9B266; --warn-soft:#D9B26622;
+      --bad:#E38A6C;  --bad-soft:#E38A6C22;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1214; --surface:#161B1E; --surface-2:#1C2225;
+    --ink:#E7EBEB; --ink-2:#98A4A7; --ink-3:#6C7779;
+    --line:#272F33; --line-strong:#3A4448;
+    --accent:#54C6D2; --accent-soft:#54C6D226; --accent-ink:#8FDCE4;
+    --good:#74C295; --good-soft:#74C29522;
+    --warn:#D9B266; --warn-soft:#D9B26622;
+    --bad:#E38A6C;  --bad-soft:#E38A6C22;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 28px -18px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+    font-size:15px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    padding:clamp(20px,4vw,56px) clamp(16px,4vw,40px) 96px;
+  }
+  .page{max-width:1080px; margin:0 auto; display:flex; flex-direction:column; gap:44px}
+
+  h1,h2,h3{font-family:"IBM Plex Sans Condensed","IBM Plex Sans",sans-serif; text-wrap:balance; margin:0; line-height:1.15}
+  h1{font-size:clamp(30px,4.6vw,44px); font-weight:700; letter-spacing:-.015em}
+  h2{font-size:22px; font-weight:600; letter-spacing:-.005em}
+  h3{font-size:16px; font-weight:600}
+  p{margin:0; max-width:68ch}
+  .lede{color:var(--ink-2); font-size:16.5px}
+  .mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:500;
+    letter-spacing:.13em; text-transform:uppercase; color:var(--ink-3);
+  }
+
+  header{display:flex; flex-direction:column; gap:14px; padding-bottom:8px; border-bottom:1px solid var(--line)}
+  .meta-row{display:flex; flex-wrap:wrap; gap:8px 22px; color:var(--ink-2); font-size:13px}
+  .meta-row span strong{color:var(--ink); font-weight:600}
+
+  .verdict{
+    background:var(--surface); border:1px solid var(--line); border-radius:4px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .verdict-head{
+    padding:20px 24px 18px; border-bottom:1px solid var(--line);
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px;
+  }
+  .verdict-name{font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:600; color:var(--accent-ink)}
+  .verdict-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr))}
+  .stat{padding:18px 24px 20px; border-right:1px solid var(--line); display:flex; flex-direction:column; gap:3px}
+  .stat:last-child{border-right:0}
+  .stat-k{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+  .stat-v{font-family:"IBM Plex Sans Condensed",sans-serif; font-size:29px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.05}
+  .stat-note{font-size:12.5px; color:var(--ink-2)}
+  @media(max-width:640px){.stat{border-right:0; border-bottom:1px solid var(--line)}}
+
+  section{display:flex; flex-direction:column; gap:18px}
+  .sec-head{display:flex; flex-direction:column; gap:6px}
+
+  .tw{overflow-x:auto; background:var(--surface); border:1px solid var(--line); border-radius:4px; box-shadow:var(--shadow)}
+  table{border-collapse:collapse; width:100%; min-width:760px; font-size:13.5px}
+  thead th{
+    font-family:"IBM Plex Mono",monospace; font-size:10.5px; font-weight:500;
+    letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3);
+    text-align:left; padding:13px 14px; border-bottom:1px solid var(--line-strong); white-space:nowrap;
+  }
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:middle}
+  tbody tr:last-child td{border-bottom:0}
+  tbody tr.top td{background:var(--accent-soft)}
+  tbody tr.gone td{color:var(--ink-3)}
+  .rank{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-3); width:1%}
+  .mname{font-family:"IBM Plex Mono",monospace; font-size:12.5px; font-weight:500; white-space:nowrap}
+  .msub{display:block; font-family:"IBM Plex Sans",sans-serif; font-size:11.5px; color:var(--ink-3); font-weight:400}
+  .cfg{color:var(--ink-2); font-size:12.5px; white-space:nowrap}
+  td.n{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap}
+
+  .bar{display:flex; align-items:center; gap:9px; min-width:150px}
+  .bar-track{flex:1; height:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:1px; overflow:hidden}
+  .bar-fill{height:100%; background:var(--accent); display:block}
+  .bar-fill.m{background:var(--ink-3)}
+  .bar-fill.bad{background:var(--bad)}
+  .bar-v{font-family:"IBM Plex Mono",monospace; font-size:12.5px; font-variant-numeric:tabular-nums; width:5ch; text-align:right}
+
+  .levers{display:grid; grid-template-columns:repeat(auto-fit,minmax(232px,1fr)); gap:12px}
+  .lever{
+    background:var(--surface); border:1px solid var(--line); border-radius:4px;
+    padding:16px 17px 17px; display:flex; flex-direction:column; gap:7px;
+  }
+  .lever-t{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-2)}
+  .lever-d{font-family:"IBM Plex Sans Condensed",sans-serif; font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1}
+  .lever-d.up{color:var(--good)} .lever-d.down{color:var(--bad)} .lever-d.flat{color:var(--ink-2)}
+  .lever-n{font-size:12.5px; color:var(--ink-2)}
+  .lever-n b{color:var(--ink); font-weight:600}
+
+  .cls{display:flex; flex-direction:column; background:var(--surface); border:1px solid var(--line); border-radius:4px; overflow:hidden}
+  .cls-row{display:grid; grid-template-columns:minmax(120px,150px) 1fr auto; align-items:center; gap:14px; padding:11px 17px; border-bottom:1px solid var(--line)}
+  .cls-row:last-child{border-bottom:0}
+  .cls-n{font-family:"IBM Plex Mono",monospace; font-size:12.5px}
+  .cls-v{font-family:"IBM Plex Mono",monospace; font-size:12.5px; font-variant-numeric:tabular-nums}
+  .cls-row.dead .cls-n,.cls-row.dead .cls-v{color:var(--bad)}
+  .cls-row.dead .bar-fill{background:var(--bad)}
+
+  .finds{display:flex; flex-direction:column; gap:10px}
+  .find{
+    background:var(--surface); border:1px solid var(--line); border-left:3px solid var(--line-strong);
+    border-radius:3px; padding:15px 18px; display:flex; flex-direction:column; gap:7px;
+  }
+  .find.crit{border-left-color:var(--bad)}
+  .find.warn{border-left-color:var(--warn)}
+  .find.info{border-left-color:var(--accent)}
+  .find.done{border-left-color:var(--good)}
+  .find-h{display:flex; flex-wrap:wrap; align-items:center; gap:10px}
+  .chip{
+    font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; letter-spacing:.09em;
+    text-transform:uppercase; padding:3px 7px; border-radius:2px; white-space:nowrap;
+  }
+  .chip.crit{background:var(--bad-soft); color:var(--bad)}
+  .chip.warn{background:var(--warn-soft); color:var(--warn)}
+  .chip.info{background:var(--accent-soft); color:var(--accent-ink)}
+  .chip.done{background:var(--good-soft); color:var(--good)}
+  .find p{font-size:13.5px; color:var(--ink-2); max-width:78ch}
+  .find code{font-family:"IBM Plex Mono",monospace; font-size:12.5px; background:var(--surface-2); border:1px solid var(--line); border-radius:2px; padding:1px 5px; color:var(--ink)}
+  .fix{font-size:13px; color:var(--ink); padding-top:2px}
+  .fix b{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-3); font-weight:500; margin-right:7px}
+
+  .tree{
+    background:var(--surface); border:1px solid var(--line); border-radius:4px;
+    padding:18px 20px; overflow-x:auto;
+    font-family:"IBM Plex Mono",monospace; font-size:12.5px; line-height:1.85; color:var(--ink-2);
+  }
+  .tree b{color:var(--ink); font-weight:600}
+  .tree i{color:var(--ink-3); font-style:normal}
+
+  footer{border-top:1px solid var(--line); padding-top:18px; color:var(--ink-3); font-size:12.5px; display:flex; flex-direction:column; gap:5px}
+</style>
+
+<div class="page">
+
+  <header>
+    <div class="eyebrow">Segmentación de elementos estructurales · 7 clases · 400 imágenes</div>
+    <h1>Auditoría de modelos YOLO-seg</h1>
+    <p class="lede">28 entrenamientos en 12 configuraciones. La auditoría encontró tres defectos metodológicos; los tres están corregidos y el proyecto quedó reducido a los 5 modelos que valía la pena conservar.</p>
+    <div class="meta-row">
+      <span><strong>12</strong> configuraciones comparadas</span>
+      <span><strong>5</strong> modelos conservados</span>
+      <span><strong>3</strong> defectos corregidos</span>
+      <span><strong>1.5 GB</strong> liberados</span>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <div class="verdict-head">
+      <span class="eyebrow">Recomendado · rank 1</span>
+      <span class="verdict-name">v8s_800_colab</span>
+      <span class="cfg">YOLOv8s-seg · 800 px · oversampling 3×</span>
+    </div>
+    <div class="verdict-grid">
+      <div class="stat">
+        <span class="stat-k">Box mAP50</span>
+        <span class="stat-v">0.5674</span>
+        <span class="stat-note">el primero de la tabla</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Mask mAP50</span>
+        <span class="stat-v">0.5259</span>
+        <span class="stat-note">la métrica que manda en segmentación</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Tamaño</span>
+        <span class="stat-v">22.8<span style="font-size:16px"> MB</span></span>
+        <span class="stat-note">el YOLO11s del rank 2 pesa 14 % menos</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Instancias no detectadas</span>
+        <span class="stat-v">23.3<span style="font-size:16px"> %</span></span>
+        <span class="stat-note">el problema real, no la confusión de clases</span>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>El problema no es confundir clases, es no detectar</h2>
+      <p class="lede">Matriz de confusión de <span class="mono">v8s_800_colab</span> sobre las 2 746 instancias anotadas del set de test.</p>
+    </div>
+    <div class="levers">
+      <div class="lever">
+        <span class="lever-t">Detectadas y bien clasificadas</span>
+        <span class="lever-d up">71.4 %</span>
+        <span class="lever-n"><b>1 961</b> de 2 746 instancias</span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">No detectadas (predichas como fondo)</span>
+        <span class="lever-d down">23.3 %</span>
+        <span class="lever-n"><b>641</b> instancias que el modelo no vio</span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">Detectadas con la clase equivocada</span>
+        <span class="lever-d flat">5.2 %</span>
+        <span class="lever-n"><b>144</b> instancias · casi todas pandereta ↔ kk</span>
+      </div>
+    </div>
+    <p class="lede" style="font-size:14px">Esto reorienta el trabajo pendiente. El modelo distingue bien las clases cuando encuentra el objeto — el error de clasificación es cuatro veces menor que el de detección. Subir el <em>recall</em> (bajar el umbral de confianza, revisar si faltan anotaciones en las imágenes densas) rinde más que cambiar de arquitectura.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Qué se pierde en cada clase</h2>
+      <p class="lede">Porcentaje de instancias anotadas que el modelo no detecta. Escala 0–50 %.</p>
+    </div>
+    <div class="cls">
+      <div class="cls-row"><span class="cls-n">sobrecimiento</span><span class="bar-track"><span class="bar-fill bad" style="width:86.2%"></span></span><span class="cls-v">43.1 %</span></div>
+      <div class="cls-row"><span class="cls-n">viga</span><span class="bar-track"><span class="bar-fill bad" style="width:84.4%"></span></span><span class="cls-v">42.2 %</span></div>
+      <div class="cls-row"><span class="cls-n">muro_revestido</span><span class="bar-track"><span class="bar-fill bad" style="width:80.8%"></span></span><span class="cls-v">40.4 %</span></div>
+      <div class="cls-row"><span class="cls-n">muro_pandereta</span><span class="bar-track"><span class="bar-fill bad" style="width:67.0%"></span></span><span class="cls-v">33.5 %</span></div>
+      <div class="cls-row"><span class="cls-n">columna</span><span class="bar-track"><span class="bar-fill" style="width:34.0%"></span></span><span class="cls-v">17.0 %</span></div>
+      <div class="cls-row"><span class="cls-n">muro_kk</span><span class="bar-track"><span class="bar-fill" style="width:31.4%"></span></span><span class="cls-v">15.7 %</span></div>
+      <div class="cls-row dead"><span class="cls-n">muro_adobe</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="cls-v">sin datos</span></div>
+    </div>
+    <p class="lede" style="font-size:13.5px"><span class="mono">muro_pandereta</span> es la única clase con un problema de <em>clasificación</em> además de detección: 41 de sus instancias se predicen como <span class="mono">muro_kk</span>. Tiene sentido — son dos tipos de ladrillo. <span class="mono">muro_adobe</span> marca 0.0000 en los 28 modelos por falta de instancias: en la práctica esto es un problema de seis clases.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Ranking completo</h2>
+      <p class="lede">Barra sólida = box mAP50; barra gris = mask mAP50. Escala común 0–0.60. Las filas atenuadas son modelos que ya se borraron; sus cifras se conservan como referencia.</p>
+    </div>
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th></th><th>Configuración</th><th>Arquitectura</th><th>Datos</th>
+            <th>Box mAP50</th><th>Mask mAP50</th><th style="text-align:right">MB</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="top">
+            <td class="rank">1</td>
+            <td class="mname">v8s_800_colab<span class="msub">recomendado</span></td>
+            <td class="cfg">YOLOv8s · 800 px</td><td class="cfg">oversample 3×</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:94.6%"></span></span><span class="bar-v">.5674</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:87.7%"></span></span><span class="bar-v">.5259</span></div></td>
+            <td class="n">22.8</td>
+          </tr>
+          <tr class="top">
+            <td class="rank">2</td>
+            <td class="mname">yolo11s_800_colab<span class="msub">alternativa ligera</span></td>
+            <td class="cfg">YOLO11s · 800 px</td><td class="cfg">oversample 3×</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:94.3%"></span></span><span class="bar-v">.5660</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:87.3%"></span></span><span class="bar-v">.5236</span></div></td>
+            <td class="n">19.6</td>
+          </tr>
+          <tr>
+            <td class="rank">3</td>
+            <td class="mname">v8s_800_local<span class="msub">conservado</span></td>
+            <td class="cfg">YOLOv8s · 800 px</td><td class="cfg">oversample 3×</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:93.3%"></span></span><span class="bar-v">.5599</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:84.5%"></span></span><span class="bar-v">.5070</span></div></td>
+            <td class="n">22.8</td>
+          </tr>
+          <tr>
+            <td class="rank">4</td>
+            <td class="mname">v8s_640_cp03<span class="msub">conservado</span></td>
+            <td class="cfg">YOLOv8s · 640 px</td><td class="cfg">oversample 3× + cp 0.3</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:90.7%"></span></span><span class="bar-v">.5441</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:79.9%"></span></span><span class="bar-v">.4791</span></div></td>
+            <td class="n">22.8</td>
+          </tr>
+          <tr>
+            <td class="rank">5</td>
+            <td class="mname">v8s_640<span class="msub">conservado</span></td>
+            <td class="cfg">YOLOv8s · 640 px</td><td class="cfg">oversample 3×</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:90.4%"></span></span><span class="bar-v">.5424</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:80.1%"></span></span><span class="bar-v">.4806</span></div></td>
+            <td class="n">22.8</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">6</td>
+            <td class="mname">small_baseline<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8s · 640 px</td><td class="cfg">base (275 img)</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:90.1%"></span></span><span class="bar-v">.5404</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:79.6%"></span></span><span class="bar-v">.4774</span></div></td>
+            <td class="n">22.8</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">7</td>
+            <td class="mname">nano_over3x_cp0.3<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8n · 640 px</td><td class="cfg">oversample 3× + cp 0.3</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:85.1%"></span></span><span class="bar-v">.5106</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:73.8%"></span></span><span class="bar-v">.4427</span></div></td>
+            <td class="n">6.5</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">8</td>
+            <td class="mname">medium<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8m · 640 px</td><td class="cfg">base · batch 4</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:84.9%"></span></span><span class="bar-v">.5096</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:75.6%"></span></span><span class="bar-v">.4537</span></div></td>
+            <td class="n">52.3</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">9</td>
+            <td class="mname">nano_cp0.3<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8n · 640 px</td><td class="cfg">copy-paste 0.3</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:84.5%"></span></span><span class="bar-v">.5069</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:72.2%"></span></span><span class="bar-v">.4334</span></div></td>
+            <td class="n">6.5</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">10</td>
+            <td class="mname">nano_over3x<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8n · 640 px</td><td class="cfg">oversample 3×</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:84.2%"></span></span><span class="bar-v">.5054</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:74.0%"></span></span><span class="bar-v">.4440</span></div></td>
+            <td class="n">6.5</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">11</td>
+            <td class="mname">nano_baseline<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8n · 640 px</td><td class="cfg">base (275 img)</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:82.8%"></span></span><span class="bar-v">.4965</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:71.2%"></span></span><span class="bar-v">.4269</span></div></td>
+            <td class="n">6.5</td>
+          </tr>
+          <tr class="gone">
+            <td class="rank">12</td>
+            <td class="mname">nano_cp0.5<span class="msub">borrado</span></td>
+            <td class="cfg">YOLOv8n · 640 px</td><td class="cfg">copy-paste 0.5</td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill" style="width:81.2%"></span></span><span class="bar-v">.4873</span></div></td>
+            <td><div class="bar"><span class="bar-track"><span class="bar-fill m" style="width:68.9%"></span></span><span class="bar-v">.4133</span></div></td>
+            <td class="n">6.5</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Qué movió realmente la aguja</h2>
+      <p class="lede">Delta en box mAP50 respecto al control de cada experimento.</p>
+    </div>
+    <div class="levers">
+      <div class="lever">
+        <span class="lever-t">nano → small</span>
+        <span class="lever-d up">+0.0439</span>
+        <span class="lever-n"><b>+8.8 %</b> · la palanca más fuerte del proyecto</span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">640 px → 800 px</span>
+        <span class="lever-d up">+0.0175</span>
+        <span class="lever-n"><b>+3.2 %</b> · a costa de bajar batch de 8 a 4</span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">copy-paste 0.3 (nano)</span>
+        <span class="lever-d up">+0.0104</span>
+        <span class="lever-n">en small el efecto desaparece: <b>+0.0017</b></span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">oversample 3× (nano)</span>
+        <span class="lever-d up">+0.0089</span>
+        <span class="lever-n">en small casi nulo: <b>+0.0020</b></span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">YOLOv8s → YOLO11s</span>
+        <span class="lever-d flat">−0.0014</span>
+        <span class="lever-n">empate técnico con <b>14 % menos peso</b></span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">copy-paste 0.5 (nano)</span>
+        <span class="lever-d down">−0.0092</span>
+        <span class="lever-n">pasado 0.3 la augmentación <b>degrada</b></span>
+      </div>
+      <div class="lever">
+        <span class="lever-t">small → medium</span>
+        <span class="lever-d down">−0.0308</span>
+        <span class="lever-n"><b>−5.7 %</b> · más capacidad, peor resultado</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Defectos encontrados y cómo se cerraron</h2>
+      <p class="lede">Los tres invalidaban comparaciones o iban a contaminar el próximo entrenamiento.</p>
+    </div>
+    <div class="finds">
+
+      <div class="find done">
+        <div class="find-h"><span class="chip done">Corregido</span><h3>El barrido de learning rate estaba parcialmente invalidado</h3></div>
+        <p><code>lr_0.001</code>, <code>lr_0.01</code> y <code>lr_0.02</code> se corrieron con <code>optimizer: auto</code>, que en Ultralytics <em>sobrescribe</em> <code>lr0</code>. Las curvas de <code>lr_0.001</code> y <code>lr_0.01</code> resultaron idénticas dígito a dígito — mismo <code>lr/pg0</code> inicial de 0.00016362 — pese a un <code>lr0</code> 10× distinto. El learning rate nunca se aplicó, y el salto de 0.23 a 0.45 mAP50 que parecía deberse a él venía del batch (2 → 8) y del optimizador.</p>
+        <p class="fix"><b>Cierre</b>El software fija <code>optimizer='AdamW'</code> en <code>config.py</code> y no expone <code>auto</code>. Las corridas inválidas se descartaron; el óptimo entre las válidas sigue siendo <code>lr0 = 0.002</code>.</p>
+      </div>
+
+      <div class="find done">
+        <div class="find-h"><span class="chip done">Corregido</span><h3>train.txt quedaba en estado oversampled</h3></div>
+        <p><code>dataset/train.txt</code> tenía <strong>824 líneas para 275 imágenes únicas</strong>. El script de oversampling reescribía el archivo y lo restauraba al final, pero si se interrumpía a mitad el estado persistía, y el siguiente entrenamiento usaba oversampling 3× en silencio.</p>
+        <p class="fix"><b>Cierre</b>La restauración vive ahora en un bloque <code>finally</code>: el split vuelve aunque el entrenamiento falle. Además <code>pucp_segmentation.py split</code> lo regenera desde la semilla en cualquier momento. Estado actual: 275 imágenes únicas, sin repeticiones.</p>
+      </div>
+
+      <div class="find done">
+        <div class="find-h"><span class="chip done">Corregido</span><h3>Cuatro carpetas «final» sin ningún modelo final</h3></div>
+        <p><code>runs_final</code> y <code>runs_final_1</code> eran el mismo entrenamiento repetido. <code>runs_final_3</code> reproducía exactamente el baseline nano de otros cuatro experimentos: cinco copias del mismo resultado. <code>runs_final_2</code> era un run abortado sin pesos. Ninguna contenía el mejor modelo.</p>
+        <p class="fix"><b>Cierre</b>Las quince carpetas <code>runs*</code> se eliminaron tras extraer los 5 modelos a <code>models/</code>, verificados byte a byte contra el original.</p>
+      </div>
+
+      <div class="find warn">
+        <div class="find-h"><span class="chip warn">Abierto</span><h3>Los dos mejores modelos se entrenaron en Colab</h3></div>
+        <p>Sus <code>args.yaml</code> apuntaban a <code>/content/yolo-demo/dataset/data.yaml</code>. Entorno, versión de Ultralytics y GPU distintos al resto de la tabla, así que la ventaja de +0.0075 de <code>v8s_800_colab</code> sobre <code>v8s_800_local</code> — misma arquitectura, mismos datos, misma resolución — puede ser ruido de entorno y no mejora real.</p>
+        <p class="fix"><b>Pendiente</b>Reproducir <code>yolo11s_800_colab</code> en local antes de citar la cifra en el informe: <code>python pucp_segmentation.py train --model yolo11s-seg.pt --imgsz 800 --oversample 3</code></p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Cómo quedó el proyecto</h2>
+      <p class="lede">De 34 archivos sueltos en la raíz y 4 850 líneas repartidas en 22 scripts, a un solo software con 11 comandos.</p>
+    </div>
+    <div class="tree">
+<b>dataset/</b>              <i>366 MB · 400 imágenes, labels y splits</i><br>
+<b>models/</b>               <i>120 MB · 5 pesos + models.csv</i><br>
+&nbsp;&nbsp;└─ <b>history/</b>         <i>results.csv, matrices y args.yaml de cada uno</i><br>
+<b>structures/</b>           <i>el software: 8 módulos + commands/</i><br>
+<b>benchmark_results/</b>    <i>regenerado con los 5 modelos actuales</i><br>
+<b>confusion_matrices/</b>   <i>regenerado con los 5 modelos actuales</i><br>
+<b>pucp_segmentation.py</b>  <i>python pucp_segmentation.py &lt;comando&gt;</i>
+    </div>
+    <p class="lede" style="font-size:13.5px">Los comandos leen los pesos de <span class="mono">models/models.csv</span>, no de rutas a carpetas de entrenamiento, que es lo que permitió borrar <span class="mono">runs*</span> sin romper nada. Comandos disponibles: <span class="mono">lr</span>, <span class="mono">convergence</span>, <span class="mono">train</span>, <span class="mono">benchmark</span>, <span class="mono">matrices</span>, <span class="mono">predict</span>, <span class="mono">models</span>, <span class="mono">ranking</span>, <span class="mono">stats</span>, <span class="mono">validate</span>, <span class="mono">split</span>.</p>
+    <p class="lede" style="font-size:13.5px">Los 5 modelos ya no son una decisión manual: el registro es un leaderboard fijo de 5. Al entrar uno nuevo, el de peor <span class="mono">mask_mAP50</span> se archiva en <span class="mono">models/archive/</span> —pesos e historial— y sale del CSV. Si el dataset crece, <span class="mono">train</span> re-evalúa los 5 sobre el <span class="mono">test</span> nuevo antes de rankear, para no comparar cifras de conjuntos distintos.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Siguientes pasos</h2>
+    </div>
+    <div class="finds">
+      <div class="find info">
+        <div class="find-h"><span class="chip info">Prioridad</span><h3>Atacar el recall, no la arquitectura</h3></div>
+        <p>El 23.3 % de instancias no detectadas pesa más de cuatro veces lo que el 5.2 % mal clasificadas. Barrer el umbral de confianza por debajo de 0.25 y medir el intercambio precisión/recall cuesta minutos y no requiere reentrenar. <code>sobrecimiento</code>, <code>viga</code> y <code>muro_revestido</code> pierden más del 40 % de sus instancias: conviene revisar si están sub-anotadas en las imágenes densas.</p>
+      </div>
+      <div class="find info">
+        <div class="find-h"><span class="chip info">Experimento</span><h3>YOLO11s a 1024 px</h3></div>
+        <p>La resolución es la única palanca que no se agotó: 640 → 800 dio +3.2 % y no se probó más arriba. Subir capacidad ya se descartó — <code>medium</code> quedó 5.7 % por debajo de <code>small</code>, señal de sobreajuste con 275 imágenes de entrenamiento.</p>
+      </div>
+      <div class="find info">
+        <div class="find-h"><span class="chip info">Dataset</span><h3>Decidir qué hacer con muro_adobe</h3></div>
+        <p>Cero detecciones en los 28 modelos. O se anotan más instancias, o se saca del <code>data.yaml</code> y se reporta como problema de seis clases: hoy la clase solo baja el promedio sin aportar información.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Las cifras de mAP50 provienen de <span class="mono">model.val()</span> sobre el mismo split, no de la última fila de <span class="mono">results.csv</span>, que reporta la última época y no la mejor.</span>
+    <span>Las columnas por clase de <span class="mono">metricas_por_clase.csv</span> son métricas de máscara; su promedio equivale a <span class="mono">mAP50_segmentacion</span>.</span>
+    <span>El desglose de detección procede de la matriz de confusión de <span class="mono">v8s_800_colab</span> sobre las 40 imágenes de test (2 746 instancias anotadas).</span>
+  </footer>
+
+</div>
