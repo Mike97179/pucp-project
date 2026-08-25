@@ -135,11 +135,14 @@ métricas obtenidas sobre `test`.
 ```bash
 python pucp_segmentation.py train --imgsz 800 --oversample 3   # -> model_1
 python pucp_segmentation.py train --imgsz 640                  # -> model_2, el 1 sigue intacto
+python pucp_segmentation.py train --no-oversample              # -> model_3, sin repetir clases débiles
 ```
 
 Sin opciones, `train` pregunta la configuración una a una (arquitectura,
 resolución, oversampling, épocas, learning rate y batch) con valores por
-defecto razonables. Lo que se pase por línea de comandos no se pregunta.
+defecto razonables. En la pregunta del oversampling, `no` lo desactiva
+(equivale a `--no-oversample` o `--oversample no`). Lo que se pase por línea
+de comandos no se pregunta.
 `train --reproduce` repite la configuración exacta del modelo rank 1, leída de
 su `args.yaml`: es lo que hay que usar para reentrenar tras anotar imágenes
 nuevas.

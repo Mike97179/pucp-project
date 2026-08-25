@@ -47,6 +47,9 @@ python pucp_segmentation.py train
 # Entrenar sin preguntas, dando los valores
 python pucp_segmentation.py train --model yolo11s-seg.pt --imgsz 800 --oversample 3
 
+# Entrenar sin oversampling (también vale --oversample no, o responder "no" al menú)
+python pucp_segmentation.py train --no-oversample
+
 # Repetir la configuración del modelo rank 1 (por ejemplo tras añadir imágenes)
 python pucp_segmentation.py train --reproduce
 
@@ -176,7 +179,9 @@ sobre lo reproducido: `--reproduce --epochs 100` repite el resto y entrena más
 tiempo.
 
 En modo default se pregunta **solo lo que falta**: `train --imgsz 800` salta
-esa pregunta y hace las demás. Enter acepta el valor por defecto
+esa pregunta y hace las demás. El menú del oversampling ofrece `no / 2 / 3`:
+`no` entrena sin repetir nada, y la columna `data` del registro queda en
+`base` en vez de `oversample_Nx`. Enter acepta el valor por defecto
 (`yolov8s-seg.pt`, 800, oversampling 3, 70 épocas, `lr0` 0.002, batch 8), que
 es también lo que se usa cuando no hay terminal interactiva. Se aceptan
 valores fuera de la lista si son del tipo correcto (120 épocas, por ejemplo);

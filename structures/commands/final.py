@@ -42,7 +42,11 @@ LEADERBOARD_COLUMNS = ['rank', 'name', 'architecture', 'imgsz', 'data',
 ARCHITECTURES  = ['yolov8n-seg.pt', 'yolov8s-seg.pt',
                   'yolo11n-seg.pt', 'yolo11s-seg.pt']
 IMGSZ_CHOICES  = [640, 800]
-OVERSAMPLE_CHOICES = [1, 2, 3]
+# El factor 1 es "no repetir nada". En el menú se ofrece como 'no' para que la
+# opción de no aplicarlo se vea, en vez de esconderse detrás de un 1.
+OVERSAMPLE_OFF     = 1
+OVERSAMPLE_OFF_WORDS = ('no', 'n', 'ninguno', 'none', 'off', '1')
+OVERSAMPLE_CHOICES = ['no', 2, 3]
 EPOCHS_CHOICES = [50, 70, 100]
 LR0_CHOICES    = [0.001, 0.002, 0.005]
 BATCH_CHOICES  = ['auto', 2, 4, 8]
@@ -73,6 +77,18 @@ def _describe_data(args):
     if args.copy_paste:
         parts.append(f'copy_paste {args.copy_paste}')
     return ' + '.join(parts) if parts else 'base'
+
+
+def _parse_oversample(value):
+    """Read an oversampling factor: 'no' (or 1) means do not apply it."""
+    if str(value).strip().lower() in OVERSAMPLE_OFF_WORDS:
+        return OVERSAMPLE_OFF
+    return int(value)
+
+
+def _format_oversample(factor):
+    """Oversampling factor for the screen: 1 is not '1x', it is off."""
+    return 'desactivado' if factor <= OVERSAMPLE_OFF else f'{factor}x'
 
 
 def _format_batch(batch):
@@ -145,8 +161,9 @@ def _ask_missing(args):
         args.imgsz = int(_ask('Resolución  ', IMGSZ_CHOICES,
                               DEFAULTS['imgsz'], cast=int))
     if args.oversample is None:
-        args.oversample = int(_ask('Oversampling', OVERSAMPLE_CHOICES,
-                                   DEFAULTS['oversample'], cast=int))
+        args.oversample = _parse_oversample(
+            _ask('Oversampling', OVERSAMPLE_CHOICES, DEFAULTS['oversample'],
+                 cast=_parse_oversample))
     if args.epochs is None:
         args.epochs = int(_ask('Épocas      ', EPOCHS_CHOICES,
                                DEFAULTS['epochs'], cast=int))
@@ -347,6 +364,16 @@ def _report_leaderboard(model_name, mask_map, before, after, final_path):
 
 
 def run(args):
+    # --no-oversample es un atajo de --oversample no: se resuelve antes de
+    # nada para que valga también en modo --reproduce, donde la línea de
+    # comandos manda sobre lo que traiga el modelo rank 1.
+    if args.no_oversample:
+        if args.oversample is not None and args.oversample != OVERSAMPLE_OFF:
+            print(f'--no-oversample y --oversample {args.oversample} se '
+                  f'contradicen: elige uno de los dos.')
+            return 1
+        args.oversample = OVERSAMPLE_OFF
+
     # Modo reproducir o modo nuevo: los dos dejan args con todos los
     # hiperparámetros resueltos antes de tocar nada.
     reproduced = _reproduce_setup(args) if args.reproduce else None
@@ -372,7 +399,7 @@ def run(args):
     print(f'  Learning rate : {args.lr0}')
     print(f'  Épocas        : {args.epochs}   imgsz: {args.imgsz}')
     print(f'  Batch         : {_format_batch(args.batch)}   '
-          f'oversampling: {args.oversample}x')
+          f'oversampling: {_format_oversample(args.oversample)}')
     print(f'  Carpeta       : {runs_path}')
     if reproduced:
         print(f'  Reproduce     : {reproduced}')
@@ -515,10 +542,14 @@ def register(subparsers):
                    help=f'Learning rate (si se omite se pregunta; '
                         f'default {DEFAULTS["lr0"]})')
     p.add_argument('--seed', type=int, default=config.SEED)
-    p.add_argument('--oversample', type=int, default=None, metavar='N',
-                   help=f'Factor máximo de repetición de clases débiles, '
-                        f'1 = desactivado (si se omite se pregunta; '
+    p.add_argument('--oversample', type=_parse_oversample, default=None,
+                   metavar='N',
+                   help=f'Factor máximo de repetición de clases débiles; '
+                        f'"no" (o 1) lo desactiva (si se omite se pregunta; '
                         f'default {DEFAULTS["oversample"]})')
+    p.add_argument('--no-oversample', dest='no_oversample',
+                   action='store_true',
+                   help='Entrena sin oversampling, igual que --oversample no')
     p.add_argument('--copy-paste', type=float, default=None, dest='copy_paste',
                    help='Augmentación copy-paste de 0 a 1 '
                         '(0.3 fue lo mejor; 0.5 empeora)')
