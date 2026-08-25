@@ -61,11 +61,6 @@ python pucp_segmentation.py --help
 Documentación completa de cada comando y de los módulos:
 [`structures/README.md`](structures/README.md).
 
-> **Idioma.** El código y la línea de comandos están en inglés: módulos,
-> funciones, variables, docstrings, comentarios, nombres de comando, opciones
-> y las columnas de `models/models.csv`. Todo lo que el programa imprime está
-> en español.
-
 ## Modelo recomendado
 
 El recomendado es siempre el **rank 1** del registro, es decir el de mejor
