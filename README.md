@@ -93,6 +93,7 @@ benchmark_results/     comparación visual entre modelos
 confusion_matrices/    matrices de confusión
 comparativa_modelos.html  informe de la auditoría de modelos
 pucp_segmentation.py   punto de entrada
+colab_train.ipynb      entrenamiento en Colab de la configuración rank 1
 requirements.txt       dependencias
 ```
 
@@ -166,6 +167,24 @@ Elige uno (número o nombre):
 `benchmark` y `matrices` admiten varios de una vez o `todos`. Pasar
 `--model`/`--models` salta la pregunta, que es lo que hay que hacer en
 Colab o en un script sin terminal.
+
+## Entrenar en Google Colab
+
+A 800 px el entrenamiento pide más GPU de la que hay a mano: la configuración
+del rank 1 tardó **2 h 43 min** en Colab (70 épocas, ~140 s/época).
+`colab_train.ipynb` la reproduce tal cual —`yolov8s-seg` a 800 px, oversampling
+3×, AdamW con `lr0 0.002`, 70 épocas, batch 8, semilla 42— clonando este
+repositorio y usando los mismos módulos de `structures/`, así que el split, el
+oversampling y la evaluación son los del proyecto.
+
+1. Sube a Drive la carpeta `dataset/` con `images/`, `labels/`, `data.yaml` y
+   `benchmark.txt` (sin este último el split no coincide con el de local).
+2. Abre el notebook en Colab con entorno **GPU** y ejecuta las celdas en orden.
+3. Descarga de Drive la carpeta de resultados y da el modelo de alta en el
+   registro con el snippet que imprime la última celda.
+
+El notebook copia un checkpoint a Drive cada cinco épocas y trae una celda de
+reanudación, porque una sesión de Colab no siempre aguanta tres horas.
 
 ## Resultados
 
