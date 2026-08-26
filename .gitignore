@@ -12,7 +12,7 @@ __pycache__/
 # Pesos y datos: nada de esto va al repositorio
 # ------------------------------------------------------------------
 # Modelos entrenados y checkpoints base (yolov8*-seg.pt)
-*.pt
+# *.pt
 # Cache de anotaciones de Ultralytics (dataset/labels.cache)
 *.cache
 # Salida cruda de los entrenamientos
