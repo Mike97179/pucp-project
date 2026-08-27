@@ -1,8 +1,8 @@
 """
-Experiment plots.
+Gráficas de los experimentos.
 
-matplotlib in Agg mode: writes PNGs without needing a display, which is what
-WSL and Colab require.
+matplotlib en modo Agg: escribe PNGs sin necesitar pantalla, que es lo que
+WSL y Colab requieren.
 """
 
 import matplotlib
@@ -22,7 +22,7 @@ def _save(fig, target, dpi=150):
 
 
 def lr_vs_map(df, target):
-    """Learning rate (log scale) against detection and segmentation mAP50."""
+    """Learning rate (escala log) contra mAP50 de detección y segmentación."""
     fig, ax = plt.subplots(figsize=(9, 6))
     ax.plot(df['learning_rate'], df['mAP50_detection'],
             marker='o', linewidth=2, label='mAP50 detección')
@@ -41,7 +41,7 @@ def lr_vs_map(df, target):
 
 
 def convergence(df, target, lr0):
-    """mAP50 curve epoch by epoch."""
+    """Curva de mAP50 época por época."""
     fig, ax = plt.subplots(figsize=(10, 6))
     ax.plot(df['epoch'], df['metrics/mAP50(B)'], linewidth=2,
             label='mAP50 detección')
@@ -56,7 +56,7 @@ def convergence(df, target, lr0):
 
 
 def map_per_class(df, target, title='mAP50 por clase'):
-    """mAP50 bars per class, highest to lowest."""
+    """Barras de mAP50 por clase, de mayor a menor."""
     ordered = df.sort_values('mAP50', ascending=False)
 
     fig, ax = plt.subplots(figsize=(11, 6))
@@ -95,7 +95,7 @@ def _draw_matrix(ax, cm, labels, title, font=8):
 
 
 def confusion_matrix(cm, labels, target, title):
-    """A single confusion matrix with a colorbar."""
+    """Una sola matriz de confusión con barra de color."""
     fig, ax = plt.subplots(figsize=(9, 7))
     im = _draw_matrix(ax, cm, labels, title, font=9)
     ax.set_xlabel('Predicción')
@@ -105,7 +105,7 @@ def confusion_matrix(cm, labels, target, title):
 
 
 def combined_matrices(matrices, labels, target, cols=5):
-    """Every matrix side by side, to compare at a glance."""
+    """Todas las matrices lado a lado, para comparar de un vistazo."""
     n = len(matrices)
     rows = (n + cols - 1) // cols
 
@@ -124,15 +124,15 @@ def combined_matrices(matrices, labels, target, cols=5):
 
 def benchmark_comparison(class_names, gt_totals, pred_per_model, target):
     """
-    Two panels: absolute GT vs prediction counts, and per-class difference.
-    Positive = over-detection, negative = under-detection.
+    Dos paneles: conteo absoluto GT vs predicción, y diferencia por clase.
+    Positivo = sobredetección, negativo = subdetección.
     """
     model_names = list(pred_per_model)
     x = range(len(class_names))
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10))
 
-    # Top panel: absolute counts
+    # Panel superior: conteos absolutos
     ax = axes[0]
     n_bars = len(model_names) + 1
     width  = 0.8 / n_bars
@@ -151,7 +151,7 @@ def benchmark_comparison(class_names, gt_totals, pred_per_model, target):
     ax.legend(fontsize=9)
     ax.grid(True, axis='y', linestyle='--', alpha=0.4)
 
-    # Bottom panel: difference against ground truth
+    # Panel inferior: diferencia contra ground truth
     ax = axes[1]
     diff_width = 0.8 / max(1, len(model_names))
     diff_base  = [xi - diff_width * (len(model_names) - 1) / 2 for xi in x]
@@ -176,5 +176,58 @@ def benchmark_comparison(class_names, gt_totals, pred_per_model, target):
                  '(positivo = sobredetección, negativo = subdetección)')
     ax.legend(fontsize=9)
     ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+
+    return _save(fig, target)
+
+
+def analyze_comparison(class_names, counts_per_model, target, title):
+    """
+    Barras agrupadas por clase, una barra por modelo.
+
+    `counts_per_model` es un dict {model_name: [count_cls0, count_cls1, ...]},
+    ya ordenado por ranking del leaderboard.
+
+    Solo se grafican las clases que tengan al menos una detección en algún
+    modelo, para no llenar la gráfica de barras vacías.
+    """
+    model_names = list(counts_per_model)
+
+    # Filtrar clases sin detecciones en ningún modelo
+    active = []
+    active_names = []
+    for i, name in enumerate(class_names):
+        total = sum(counts_per_model[m][i] for m in model_names)
+        if total > 0:
+            active.append(i)
+            active_names.append(name)
+
+    if not active:
+        return None
+
+    x = range(len(active_names))
+    n_bars = len(model_names)
+    width = min(0.8 / max(n_bars, 1), 0.25)
+
+    fig, ax = plt.subplots(figsize=(max(10, len(active_names) * 2), 6))
+
+    for j, model_name in enumerate(model_names):
+        values = [counts_per_model[model_name][i] for i in active]
+        pos = [xi + width * (j - n_bars / 2 + 0.5) for xi in x]
+        bars = ax.bar(pos, values, width, label=model_name,
+                      color=COLORS[j % len(COLORS)])
+
+        # Valor encima de cada barra
+        for bar, value in zip(bars, values):
+            if value > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, value + 0.1,
+                        str(value), ha='center', fontsize=8)
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(active_names, rotation=45, ha='right')
+    ax.set_ylabel('Cantidad de detecciones')
+    ax.set_title(title)
+    ax.legend(fontsize=9)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+    ax.set_ylim(bottom=0)
 
     return _save(fig, target)

@@ -1,17 +1,17 @@
 """
-Registry of trained models.
+Registro de modelos entrenados.
 
-Each script used to carry its own hardcoded list of runs_experimento_*/ paths.
-Now the weights live in models/ and this module discovers them from
-models.csv, so deleting the runs* folders breaks nothing.
+Cada script solía tener su propia lista hardcodeada de rutas runs_experimento_*/.
+Ahora los pesos viven en models/ y este módulo los descubre desde models.csv,
+así que borrar las carpetas runs* no rompe nada.
 
-Every training run produces a new, numbered model (model_1, model_2, ...):
-an earlier one is never overwritten. Commands that need a model ask which one
-to use, listing the available ones.
+Cada entrenamiento produce un modelo nuevo y numerado (model_1, model_2, ...):
+uno anterior nunca se sobreescribe. Los comandos que necesitan un modelo
+preguntan cuál usar, listando los disponibles.
 
-The registry is a fixed leaderboard of MAX_MODELS entries ordered by
-mask_mAP50: when a new model pushes it over that size, the worst one is
-archived (weights and history moved to models/archive/) instead of deleted.
+El registro es un leaderboard fijo de MAX_MODELS entradas ordenadas por
+mask_mAP50: cuando un modelo nuevo lo excede, el peor se archiva (pesos e
+historial van a models/archive/) en vez de borrarse.
 """
 
 import os
@@ -27,15 +27,14 @@ from . import config, data
 MODEL_PREFIX  = 'model'
 MODEL_PATTERN = re.compile(rf'^{MODEL_PREFIX}_(\d+)$')
 
-# Size of the leaderboard: only the best MAX_MODELS models stay registered.
+# Tamaño del leaderboard: solo los mejores MAX_MODELS modelos quedan registrados.
 MAX_MODELS = 5
 
 CSV_COLUMNS = ['rank', 'name', 'file', 'architecture', 'imgsz', 'data',
                'box_mAP50', 'mask_mAP50', 'origin', 'notes']
 
-# What is kept from each training run so it can be reviewed later without
-# retraining. Ultralytics does not always write all of them: whichever exist
-# get copied.
+# Lo que se guarda de cada entrenamiento para poder revisarlo después sin
+# reentrenar. Ultralytics no siempre escribe todos: se copian los que existan.
 HISTORY_FILES = [
     'results.csv', 'results.png', 'args.yaml',
     'confusion_matrix.png', 'confusion_matrix_normalized.png',
@@ -45,13 +44,13 @@ HISTORY_FILES = [
 
 def registry(models_csv=config.MODELS_CSV):
     """
-    DataFrame of the models declared in models/models.csv, plus an absolute
-    'path' column and only the rows whose weights actually exist.
+    DataFrame de los modelos declarados en models/models.csv, con una columna
+    'path' absoluta y solo las filas cuyos pesos existan en disco.
 
-    The 'rank' column is recomputed here from mask_mAP50 instead of being
-    taken from the file: rank 1 always means the best model, even if the CSV
-    was edited by hand or a row was added with the wrong rank. The file itself
-    is not rewritten — that happens when a model is registered or re-evaluated.
+    La columna 'rank' se recalcula aquí desde mask_mAP50 en vez de tomarse
+    del archivo: rank 1 siempre es el mejor modelo, aunque el CSV se haya
+    editado a mano o una fila tenga el rank equivocado. El archivo no se
+    reescribe — eso pasa al registrar o re-evaluar un modelo.
     """
     if not os.path.isfile(models_csv):
         raise FileNotFoundError(
@@ -76,8 +75,8 @@ def registry(models_csv=config.MODELS_CSV):
 
 def resolve(name_or_path):
     """
-    Accept a registry name ('model_3'), a file name ('model_3.pt') or a loose
-    path to a .pt, and return the path to the weights.
+    Acepta un nombre del registro ('model_3'), un nombre de archivo
+    ('model_3.pt') o una ruta suelta a un .pt, y retorna la ruta a los pesos.
     """
     if os.path.isfile(name_or_path):
         return name_or_path
@@ -101,9 +100,9 @@ def resolve(name_or_path):
 
 def select(names=None):
     """
-    List of {name, path} dicts for batch work.
+    Lista de dicts {name, path} para trabajo en lote.
 
-    With no arguments it returns the whole registry, sorted by rank.
+    Sin argumentos retorna todo el registro, ordenado por rank.
     """
     df = registry()
     if names:
@@ -119,15 +118,15 @@ def select(names=None):
 
 
 # ------------------------------------------------------------------
-# Registering new models
+# Registro de modelos nuevos
 # ------------------------------------------------------------------
 def next_model_name():
     """
-    First free name in the series: model_1, model_2, ...
+    Primer nombre libre de la serie: model_1, model_2, ...
 
-    Looks at the CSV, the loose .pt files and the history folders at once: if
-    any of the three already used a number, that number is not reused. That
-    way a new training run never clobbers an earlier one's results.
+    Revisa el CSV, los .pt sueltos y las carpetas de historial a la vez:
+    si cualquiera de los tres ya usó un número, ese número no se reutiliza.
+    Así un entrenamiento nuevo nunca pisa los resultados de uno anterior.
     """
     used = {0}
 
@@ -161,7 +160,7 @@ def next_model_name():
 
 
 def _recompute_rank(df):
-    """Rank 1 = best mask_mAP50. Recomputed every time a model is added."""
+    """Rank 1 = mejor mask_mAP50. Se recalcula cada vez que se agrega un modelo."""
     if 'mask_mAP50' not in df.columns:
         return df
     order = pd.to_numeric(df['mask_mAP50'], errors='coerce').fillna(-1)
@@ -170,7 +169,7 @@ def _recompute_rank(df):
 
 
 def save_history(name, run_dir):
-    """Copy what the training run left behind to models/history/<name>/."""
+    """Copia lo que dejó el entrenamiento a models/history/<nombre>/."""
     target = os.path.join(config.HISTORY_DIR, name)
     os.makedirs(target, exist_ok=True)
 
@@ -186,16 +185,16 @@ def save_history(name, run_dir):
 
 def register_new(name, weights, run_dir=None, **fields):
     """
-    Register a freshly trained model: copy the .pt to models/<name>.pt, save
-    its history and append the matching row to models.csv.
+    Registra un modelo recién entrenado: copia el .pt a models/<nombre>.pt,
+    guarda su historial y agrega la fila correspondiente a models.csv.
 
-    `fields` accepts any of the CSV columns (architecture, imgsz, data,
+    `fields` acepta cualquier columna del CSV (architecture, imgsz, data,
     box_mAP50, mask_mAP50, origin, notes).
 
-    The registry only holds MAX_MODELS models: once the new row is in, the
-    worst one is archived. Returns where the new model's weights ended up —
-    models/<name>.pt normally, the archive path if it did not make the
-    leaderboard, or None if the user chose to discard it.
+    El registro solo guarda MAX_MODELS modelos: al agregar la fila nueva,
+    el peor se archiva. Retorna dónde quedaron los pesos del modelo nuevo —
+    models/<nombre>.pt normalmente, la ruta del archivo si no entró al
+    leaderboard, o None si el usuario decidió descartarlo.
     """
     os.makedirs(config.MODELS_DIR, exist_ok=True)
 
@@ -238,10 +237,10 @@ def register_new(name, weights, run_dir=None, **fields):
 
 
 # ------------------------------------------------------------------
-# Leaderboard of MAX_MODELS: archiving what falls out
+# Leaderboard de MAX_MODELS: archivar lo que queda fuera
 # ------------------------------------------------------------------
 def _csv_row(name, models_csv=config.MODELS_CSV):
-    """The model's row in models.csv as a dict, or None if it is not there."""
+    """Fila del modelo en models.csv como dict, o None si no está."""
     if not os.path.isfile(models_csv):
         return None
     df  = pd.read_csv(models_csv)
@@ -250,7 +249,7 @@ def _csv_row(name, models_csv=config.MODELS_CSV):
 
 
 def _weights_file(name):
-    """File name of the model's weights: what the CSV says, or <name>.pt."""
+    """Nombre de archivo de los pesos: lo que dice el CSV, o <nombre>.pt."""
     row = _csv_row(name)
     if row and isinstance(row.get('file'), str) and row['file']:
         return row['file']
@@ -258,7 +257,7 @@ def _weights_file(name):
 
 
 def _drop_from_csv(name, models_csv=config.MODELS_CSV):
-    """Remove the model's row from models.csv and recompute the ranks."""
+    """Elimina la fila del modelo de models.csv y recalcula los ranks."""
     if not os.path.isfile(models_csv):
         return
     df = pd.read_csv(models_csv)
@@ -268,7 +267,7 @@ def _drop_from_csv(name, models_csv=config.MODELS_CSV):
 
 
 def _move_without_overwriting(source, target):
-    """shutil.move that never clobbers: adds _2, _3... to the name if needed."""
+    """shutil.move que nunca sobreescribe: agrega _2, _3... al nombre si hace falta."""
     base, extension = os.path.splitext(target)
     index = 2
     while os.path.exists(target):
@@ -280,11 +279,11 @@ def _move_without_overwriting(source, target):
 
 def archive_model(name):
     """
-    Take a model out of the leaderboard without losing it: its weights move to
-    models/archive/, its models/history/<name>/ folder to
-    models/archive/<name>/, and its row leaves models.csv.
+    Saca un modelo del leaderboard sin perderlo: los pesos van a
+    models/archive/, la carpeta models/history/<nombre>/ a
+    models/archive/<nombre>/, y su fila desaparece de models.csv.
 
-    Returns the path of the archived weights, or None if there were none.
+    Retorna la ruta de los pesos archivados, o None si no había.
     """
     os.makedirs(config.ARCHIVE_DIR, exist_ok=True)
 
@@ -303,15 +302,22 @@ def archive_model(name):
 
     _drop_from_csv(name)
 
+    # Eliminar las predicciones de analyze/output/ de este modelo:
+    # al salir del leaderboard sus resultados dejan de ser útiles.
+    from .commands.analyze import clean_model_outputs
+    clean_model_outputs(name)
+
     print(f'  Archivado "{name}" en {config.ARCHIVE_DIR}')
     return archived
 
 
 def discard_model(name):
     """
-    Delete a model for good: weights, history folder and row in models.csv.
+    Elimina un modelo definitivamente: pesos, carpeta de historial y fila
+    en models.csv.
 
-    Only used when the user explicitly says so — archiving is the default.
+    Solo se usa cuando el usuario lo pide explícitamente — archivar es lo
+    que se hace por defecto.
     """
     weights = os.path.join(config.MODELS_DIR, _weights_file(name))
     if os.path.isfile(weights):
@@ -323,18 +329,21 @@ def discard_model(name):
 
     _drop_from_csv(name)
 
+    from .commands.analyze import clean_model_outputs
+    clean_model_outputs(name)
+
     print(f'  Descartado "{name}": no se guardó nada.')
 
 
 def _archive_or_discard(name):
     """
-    Ask what to do with the model just trained when it did not make the top
-    MAX_MODELS.
+    Pregunta qué hacer con el modelo recién entrenado cuando no entró al
+    top MAX_MODELS.
 
-    Without an interactive terminal there is nobody to ask, so it is archived:
-    disk space is cheaper than a lost training run.
+    Sin terminal interactiva no hay a quién preguntar, así que se archiva:
+    el espacio en disco es más barato que un entrenamiento perdido.
 
-    Returns the path of the archived weights, or None if discarded.
+    Retorna la ruta de los pesos archivados, o None si se descartó.
     """
     print(f'\n  "{name}" no superó a ninguno de los {MAX_MODELS} modelos del '
           f'leaderboard.')
@@ -360,13 +369,13 @@ def _archive_or_discard(name):
 
 def _enforce_leaderboard(new_name=None, new_path=None):
     """
-    Trim models.csv down to MAX_MODELS rows, archiving whatever falls out.
+    Recorta models.csv a MAX_MODELS filas, archivando lo que sobra.
 
-    `new_name` is the model that was just registered: if it is the one falling
-    out, the user is asked whether to archive or discard it, since it never
-    made the leaderboard to begin with.
+    `new_name` es el modelo recién registrado: si es el que sobra, se
+    pregunta al usuario si archivarlo o descartarlo, ya que nunca llegó
+    a estar en el leaderboard.
 
-    Returns where `new_name`'s weights ended up (None if they were discarded).
+    Retorna dónde quedaron los pesos de `new_name` (None si se descartaron).
     """
     if not os.path.isfile(config.MODELS_CSV):
         return new_path
@@ -387,25 +396,25 @@ def _enforce_leaderboard(new_name=None, new_path=None):
 
 
 # ------------------------------------------------------------------
-# Dataset changes and re-evaluation
+# Cambios en el dataset y re-evaluación
 # ------------------------------------------------------------------
 def dataset_fingerprint(img_dir=config.IMG_DIR):
     """
-    Total number of images in the dataset.
+    Número total de imágenes en el dataset.
 
-    Cheap stand-in for a content hash: what matters is spotting that the
-    dataset grew (newly annotated images), because from that moment on the
-    metrics stored in models.csv came from a different test set.
+    Sustituto barato de un hash de contenido: lo que importa es detectar
+    que el dataset creció (imágenes recién anotadas), porque desde ese
+    momento las métricas de models.csv vienen de un test set diferente.
     """
     return len(data.list_images(img_dir))
 
 
 def save_fingerprint(value=None, state_file=config.DATASET_STATE):
     """
-    Write the current fingerprint to models/dataset_state.txt.
+    Escribe el fingerprint actual en models/dataset_state.txt.
 
-    Called whenever the stored metrics are known to match the dataset on disk:
-    after registering a new model and after `reevaluate_all()`.
+    Se llama cuando las métricas almacenadas coinciden con el dataset en
+    disco: después de registrar un modelo nuevo y después de reevaluate_all().
     """
     if value is None:
         value = dataset_fingerprint()
@@ -418,7 +427,7 @@ def save_fingerprint(value=None, state_file=config.DATASET_STATE):
 
 
 def saved_fingerprint(state_file=config.DATASET_STATE):
-    """Fingerprint written the last time the metrics were up to date."""
+    """Fingerprint guardado la última vez que las métricas estuvieron al día."""
     if not os.path.isfile(state_file):
         return None
     try:
@@ -431,11 +440,12 @@ def saved_fingerprint(state_file=config.DATASET_STATE):
 def needs_reevaluation(img_dir=config.IMG_DIR,
                        state_file=config.DATASET_STATE):
     """
-    True when the dataset changed since the metrics in models.csv were
-    computed, so the ranking cannot be trusted until `reevaluate_all()` runs.
+    True cuando el dataset cambió desde que se calcularon las métricas de
+    models.csv, así que el ranking no es confiable hasta que corra
+    reevaluate_all().
 
-    With no fingerprint stored yet there is nothing to compare against and it
-    returns False: the first evaluation writes one.
+    Sin fingerprint guardado todavía no hay contra qué comparar y retorna
+    False: la primera evaluación lo escribe.
     """
     stored = saved_fingerprint(state_file)
     return stored is not None and stored != dataset_fingerprint(img_dir)
@@ -443,11 +453,11 @@ def needs_reevaluation(img_dir=config.IMG_DIR,
 
 def reevaluate_all(split='test'):
     """
-    Re-run model.val() on every registered model and refresh box_mAP50 and
-    mask_mAP50 in models.csv, recomputing the ranks and the fingerprint.
+    Re-ejecuta model.val() sobre cada modelo registrado y actualiza box_mAP50
+    y mask_mAP50 en models.csv, recalculando los ranks y el fingerprint.
 
-    Rows whose weights are missing are left untouched instead of dropped.
-    Returns the updated DataFrame.
+    Las filas cuyos pesos no estén en disco se dejan intactas en vez de
+    eliminarse. Retorna el DataFrame actualizado.
     """
     # Importado aquí y no arriba: evaluate carga torch y ultralytics, y este
     # módulo lo importa cada comando del CLI.
@@ -492,7 +502,7 @@ def reevaluate_all(split='test'):
 
 
 # ------------------------------------------------------------------
-# Interactive selection
+# Selección interactiva
 # ------------------------------------------------------------------
 def _visible_columns(df):
     return [c for c in ('rank', 'name', 'architecture', 'imgsz',
@@ -501,14 +511,14 @@ def _visible_columns(df):
 
 
 def _print_numbered_table(df):
-    """Print the registry with a 1..N index so it can be picked by number."""
+    """Imprime el registro con índice 1..N para elegir por número."""
     table = df[_visible_columns(df)].copy()
     table.insert(0, '#', range(1, len(table) + 1))
     print(table.to_string(index=False))
 
 
 def print_registry():
-    """Readable table of the available models."""
+    """Tabla legible de los modelos disponibles."""
     df = registry()
     if 'rank' in df.columns:
         df = df.sort_values('rank').reset_index(drop=True)
@@ -520,16 +530,16 @@ def print_registry():
 def ask(names=None, multiple=False, allow_all=None,
         title='Modelos disponibles'):
     """
-    Return the selected models as a list of {name, path} dicts.
+    Retorna los modelos seleccionados como lista de dicts {name, path}.
 
-    If `names` comes from the command line it is honoured as is. Otherwise
-    every model in the registry is listed and the user is asked which one to
-    use — by number or by name. `allow_all` (defaults to `multiple`) enables
-    answering "todos".
+    Si `names` viene de la línea de comandos se respeta tal cual. Si no,
+    se lista todo el registro y se pregunta al usuario cuál usar — por
+    número o por nombre. `allow_all` (por defecto igual a `multiple`)
+    habilita responder "todos".
 
-    Without an interactive terminal there is nobody to ask: all models are
-    used when `allow_all`, and otherwise it aborts asking for the explicit
-    argument.
+    Sin terminal interactiva no hay a quién preguntar: se usan todos los
+    modelos cuando `allow_all`, y si no aborta pidiendo el argumento
+    explícito.
     """
     if names:
         return select(names)
@@ -602,13 +612,12 @@ def ask(names=None, multiple=False, allow_all=None,
             print(error)
             continue
 
-        # dict.fromkeys: drop duplicates while keeping the order they were
-        # picked in
+        # dict.fromkeys: elimina duplicados manteniendo el orden de elección
         return select(list(dict.fromkeys(chosen)))
 
 
 def ask_one(name=None, title='Modelos disponibles'):
-    """Like `ask`, but returns the path of the single chosen model."""
+    """Como `ask`, pero retorna la ruta del único modelo elegido."""
     if name:
         return resolve(name)
     return ask(multiple=False, allow_all=False, title=title)[0]['path']

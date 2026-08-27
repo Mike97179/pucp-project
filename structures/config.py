@@ -1,12 +1,11 @@
 """
-Central configuration — paths, hyperparameters and class names.
+Configuración central — rutas, hiperparámetros y nombres de clase.
 
-Everything that used to be duplicated in section 1 of every 01/02/03 script
-lives here once.
+Todo lo que solía estar duplicado en la sección 1 de cada script 01/02/03
+ahora vive aquí una sola vez.
 
-Note on language: identifiers, docstrings, comments and the command line
-surface are in English; every string printed to the user stays in Spanish,
-since that is the project's working language.
+Los identificadores están en inglés; todo lo impreso al usuario está en
+español, que es el idioma de trabajo del proyecto.
 """
 
 import os
@@ -14,7 +13,7 @@ import yaml
 
 
 # ------------------------------------------------------------------
-# Environment and paths
+# Entorno y rutas
 # ------------------------------------------------------------------
 IN_COLAB  = 'COLAB_GPU' in os.environ or 'google.colab' in str(os.environ)
 BASE_PATH = '/content' if IN_COLAB else os.getcwd()
@@ -38,11 +37,14 @@ DATASET_STATE = os.path.join(MODELS_DIR, 'dataset_state.txt')
 BENCHMARK_OUTPUT = os.path.join(BASE_PATH, 'benchmark_results')
 MATRICES_OUTPUT  = os.path.join(BASE_PATH, 'confusion_matrices')
 
+ANALYZE_INPUT    = os.path.join(BASE_PATH, 'analyze', 'input')
+ANALYZE_OUTPUT   = os.path.join(BASE_PATH, 'analyze', 'output')
+
 IMG_EXTENSIONS = ('*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif', '*.tiff')
 
 
 # ------------------------------------------------------------------
-# Default hyperparameters
+# Hiperparámetros por defecto
 # ------------------------------------------------------------------
 SEED        = 42
 IMGSZ       = 640
@@ -52,10 +54,10 @@ PATIENCE    = 20
 WORKERS     = 2
 DEVICE      = 0
 
-# AdamW is pinned: with optimizer='auto' Ultralytics ignores the lr0 we pass.
-# That default is what invalidated the lr_0.001 / lr_0.01 / lr_0.02 runs.
+# AdamW se fija explícitamente: con optimizer='auto' Ultralytics ignora
+# el lr0 que le pasamos. Eso invalidó las corridas lr_0.001 / lr_0.01 / lr_0.02.
 OPTIMIZER   = 'AdamW'
-LR0         = 0.002          # winner of the learning rate sweep
+LR0         = 0.002          # ganador del barrido de learning rate
 COS_LR      = True
 
 BASE_MODEL  = 'yolov8n-seg.pt'
@@ -63,14 +65,14 @@ SPLIT_RATIO = (0.70, 0.20, 0.10)
 
 
 # ------------------------------------------------------------------
-# Classes
+# Clases
 # ------------------------------------------------------------------
 def load_class_names(yaml_path=YAML_PATH):
     """
-    Read the class names from data.yaml.
+    Lee los nombres de clase desde data.yaml.
 
-    They are read from the yaml instead of being hardcoded so the ID -> class
-    mapping never drifts if the order ever changes.
+    Se leen del yaml en vez de estar hardcodeados para que el mapeo
+    ID -> clase nunca se desincronice si el orden cambia.
     """
     with open(yaml_path) as f:
         data = yaml.safe_load(f)
@@ -82,5 +84,5 @@ def load_class_names(yaml_path=YAML_PATH):
 
 
 def matrix_labels(names):
-    """Class names plus the extra 'fondo' row/column Ultralytics adds."""
+    """Nombres de clase más la fila/columna extra 'fondo' que agrega Ultralytics."""
     return list(names) + ['fondo']

@@ -1,20 +1,20 @@
 """
-Command line interface.
+Interfaz de línea de comandos.
 
-Every command lives in its own module under structures/commands/ and is
-registered here with its own set of options. Command names and flags are in
-English; the help text and everything printed stay in Spanish.
+Cada comando vive en su propio módulo bajo structures/commands/ y se
+registra aquí con sus propias opciones. Los nombres de comando y flags
+están en inglés; el texto de ayuda y todo lo impreso en español.
 """
 
 import argparse
 import sys
 
 from . import __version__, config, data, models
-from .commands import (benchmark, convergence, final, lr, matrices, predict,
-                       ranking, stats, validate)
+from .commands import (analyze, benchmark, convergence, final, lr, matrices,
+                       predict, ranking, stats, validate)
 
 COMMANDS = [lr, convergence, final, benchmark, matrices, predict, ranking,
-            stats, validate]
+            stats, validate, analyze]
 
 
 def _cmd_models(args):
@@ -44,6 +44,7 @@ def build_parser():
             '  python pucp_segmentation.py ranking     # leaderboard actual\n'
             '  python pucp_segmentation.py stats       # qué hay en el dataset\n'
             '  python pucp_segmentation.py validate    # comprueba imágenes y labels\n'
+            '  python pucp_segmentation.py analyze     # analiza imágenes de analyze/input/\n'
             '  python pucp_segmentation.py predict     # pregunta qué modelo usar\n'
         ))
     parser.add_argument('--version', action='version',
