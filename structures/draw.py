@@ -7,9 +7,8 @@ copy-pasted in evaluar_benchmark.py and generar_mascaras.py.
 
 import cv2
 import numpy as np
-from ultralytics.utils.plotting import Colors
 
-PALETTE = Colors()
+from . import config
 
 
 def draw_masks(result, target, class_names, alpha=0.4):
@@ -42,12 +41,12 @@ def draw_masks(result, target, class_names, alpha=0.4):
     for i in order:
         pts = np.array(polygons[i], dtype=np.int32)
         if len(pts) >= 3:
-            cv2.fillPoly(overlay, [pts], PALETTE(int(classes[i]), True))
+            cv2.fillPoly(overlay, [pts], config.CLASS_COLORS_BGR[int(classes[i])])
     img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
 
     for i in order:
         cls_id = int(classes[i])
-        color  = PALETTE(cls_id, True)
+        color  = config.CLASS_COLORS_BGR[cls_id]
         x1, y1, x2, y2 = [int(v) for v in boxes[i]]
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness, cv2.LINE_AA)
 

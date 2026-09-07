@@ -10,6 +10,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
+from . import config
+
 COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#c98500', '#d55181']
 
 
@@ -57,10 +59,13 @@ def convergence(df, target, lr0):
 
 def map_per_class(df, target, title='mAP50 por clase'):
     """Barras de mAP50 por clase, de mayor a menor."""
+    class_names = config.load_class_names()
+    color_map = dict(zip(class_names, config.CLASS_COLORS_HEX))
     ordered = df.sort_values('mAP50', ascending=False)
+    bar_colors = [color_map.get(c, 'steelblue') for c in ordered['class']]
 
     fig, ax = plt.subplots(figsize=(11, 6))
-    bars = ax.bar(ordered['class'], ordered['mAP50'], color='steelblue')
+    bars = ax.bar(ordered['class'], ordered['mAP50'], color=bar_colors)
     ax.set_xlabel('Clase')
     ax.set_ylabel('mAP50 (segmentación)')
     ax.set_title(title)

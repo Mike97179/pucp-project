@@ -82,6 +82,29 @@ def load_class_names(yaml_path=YAML_PATH):
     return list(names)
 
 
+# Colores por clase, alineados con CVAT (orden de data.yaml).
+# BGR para OpenCV, hex para matplotlib.
+CLASS_COLORS_BGR = [
+    (214, 120, 42),   # columna       — azul
+    (122, 175, 27),   # viga           — verde
+    (186, 85, 211),   # sobrecimiento  — morado
+    (60, 60, 220),    # muro_kk        — rojo
+    (140, 150, 240),  # muro_pandereta — salmón
+    (100, 50, 20),    # muro_revestido — azul oscuro
+    (180, 210, 230),  # muro_adobe     — beige
+]
+
+CLASS_COLORS_HEX = [
+    '#2a78d6',   # columna
+    '#1baf7a',   # viga
+    '#ba55d3',   # sobrecimiento
+    '#dc3c3c',   # muro_kk
+    '#f09688',   # muro_pandereta
+    '#14325a',   # muro_revestido
+    '#e6d2b4',   # muro_adobe
+]
+
+
 def matrix_labels(names):
     """Nombres de clase más la fila/columna extra 'fondo' que agrega Ultralytics."""
     return list(names) + ['fondo']
