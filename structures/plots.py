@@ -180,6 +180,50 @@ def benchmark_comparison(class_names, gt_totals, pred_per_model, target):
     return _save(fig, target)
 
 
+def predict_summary(class_names, gt_totals, pred_per_model, target):
+    """
+    Single panel: grouped bars of ground truth vs each model's count per class.
+
+    Each new model adds one bar per class. Simpler than benchmark_comparison
+    (no diff panel) — used by the predict summary.
+    """
+    model_names = list(pred_per_model)
+    x = range(len(class_names))
+
+    n_bars = len(model_names) + 1
+    width  = 0.8 / n_bars
+
+    fig, ax = plt.subplots(figsize=(max(12, len(class_names) * 2.5), 7))
+
+    base = [xi - width * (n_bars - 1) / 2 for xi in x]
+    ax.bar(base, gt_totals, width, label='Ground truth', color='#73726c')
+
+    for j, model_name in enumerate(model_names):
+        pos = [b + width * (j + 1) for b in base]
+        bars = ax.bar(pos, pred_per_model[model_name], width,
+                      label=model_name, color=COLORS[j % len(COLORS)])
+        for bar, value in zip(bars, pred_per_model[model_name]):
+            if value > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, value + 1,
+                        str(value), ha='center', fontsize=7, color='#444')
+
+    # GT values on top of their bars too
+    for bar, value in zip(ax.patches[:len(class_names)], gt_totals):
+        if value > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, value + 1,
+                    str(value), ha='center', fontsize=7, color='#444')
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(class_names, rotation=45, ha='right')
+    ax.set_ylabel('Cantidad de instancias')
+    ax.set_title('Conteo por clase: ground truth vs predicciones')
+    ax.legend(fontsize=9)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.4)
+    ax.set_ylim(bottom=0)
+
+    return _save(fig, target)
+
+
 def analyze_comparison(class_names, counts_per_model, target, title):
     """
     Barras agrupadas por clase, una barra por modelo.

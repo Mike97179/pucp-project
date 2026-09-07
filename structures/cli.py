@@ -11,10 +11,10 @@ import sys
 
 from . import __version__, config, data, models
 from .commands import (analyze, benchmark, convergence, final, lr, matrices,
-                       predict, ranking, stats, validate)
+                       predict, ranking, stats, update, validate)
 
 COMMANDS = [lr, convergence, final, benchmark, matrices, predict, ranking,
-            stats, validate, analyze]
+            stats, validate, analyze, update]
 
 
 def _cmd_models(args):
@@ -46,6 +46,7 @@ def build_parser():
             '  python pucp_segmentation.py validate    # comprueba imágenes y labels\n'
             '  python pucp_segmentation.py analyze     # analiza imágenes de analyze/input/\n'
             '  python pucp_segmentation.py predict     # pregunta qué modelo usar\n'
+            '  python pucp_segmentation.py update carpeta/  # registra modelo de Colab\n'
         ))
     parser.add_argument('--version', action='version',
                         version=f'structures {__version__}')

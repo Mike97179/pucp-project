@@ -52,6 +52,31 @@ def run(args):
     print(f'\nTodas las matrices en: {config.MATRICES_OUTPUT}')
 
 
+def clean_model_matrices(model_name, output_dir=None):
+    """
+    Remove a model's confusion matrix and the combined image.
+
+    Called by models.archive_model() when a model leaves the leaderboard.
+    The combined all_matrices.png is deleted because it includes the removed
+    model; it will be regenerated on the next `matrices` run.
+    """
+    if output_dir is None:
+        output_dir = config.MATRICES_OUTPUT
+
+    if not os.path.isdir(output_dir):
+        return
+
+    removed = False
+    for fname in (f'matrix_{model_name}.png', 'all_matrices.png'):
+        path = os.path.join(output_dir, fname)
+        if os.path.isfile(path):
+            os.remove(path)
+            removed = True
+
+    if removed:
+        print(f'  Limpieza: matriz de "{model_name}" eliminada')
+
+
 def register(subparsers):
     p = subparsers.add_parser(
         'matrices', help='Matrices de confusión de los modelos entrenados')

@@ -157,6 +157,61 @@ def run(args):
     print(f'\nResultados visuales en: {config.BENCHMARK_OUTPUT}')
 
 
+def clean_model_benchmark(model_name, output_dir=None):
+    """
+    Remove a model's benchmark outputs and rebuild the comparative files.
+
+    Called by models.archive_model() when a model leaves the leaderboard.
+    """
+    import shutil
+
+    if output_dir is None:
+        output_dir = config.BENCHMARK_OUTPUT
+
+    if not os.path.isdir(output_dir):
+        return
+
+    folder = os.path.join(output_dir, model_name)
+    if os.path.isdir(folder):
+        shutil.rmtree(folder)
+
+    excel = os.path.join(output_dir, 'benchmark_comparison.xlsx')
+    chart = os.path.join(output_dir, 'benchmark_comparison.png')
+
+    if not os.path.isfile(excel):
+        for path in (excel, chart):
+            if os.path.isfile(path):
+                os.remove(path)
+        return
+
+    df = pd.read_csv(excel) if excel.endswith('.csv') else pd.read_excel(excel)
+    df = df[df['model'] != model_name]
+
+    if df.empty:
+        for path in (excel, chart):
+            if os.path.isfile(path):
+                os.remove(path)
+        print(f'  Limpieza: benchmark de "{model_name}" eliminado '
+              f'(no quedan modelos)')
+        return
+
+    df.to_excel(excel, index=False, sheet_name='Benchmark')
+
+    class_names = config.load_class_names()
+    gt_totals = None
+    pred_per_model = {}
+    for mn in df['model'].unique():
+        df_model = df[df['model'] == mn]
+        pred_per_model[mn] = [
+            int(df_model[f'{n}_pred'].sum()) for n in class_names]
+        if gt_totals is None:
+            gt_totals = [int(df_model[f'{n}_gt'].sum()) for n in class_names]
+
+    plots.benchmark_comparison(class_names, gt_totals, pred_per_model, chart)
+    print(f'  Limpieza: benchmark de "{model_name}" eliminado, '
+          f'comparativo regenerado')
+
+
 def register(subparsers):
     p = subparsers.add_parser(
         'benchmark', help='Compara modelos sobre las imágenes de benchmark.txt')

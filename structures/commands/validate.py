@@ -15,6 +15,37 @@ import os
 
 from .. import config, data
 
+def _read_split_basenames():
+    """Basenames already assigned to train/val/test."""
+    names = set()
+    for txt in (config.TRAIN_TXT, config.VAL_TXT, config.TEST_TXT):
+        if os.path.isfile(txt):
+            with open(txt) as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        names.add(os.path.basename(line))
+    return names
+
+
+def _update_splits_if_needed(images):
+    """Regenerate train/val/test.txt when images are missing from the splits."""
+    benchmark_names = data.read_benchmark_names()
+    split_names = _read_split_basenames()
+
+    splittable = [img for img in images
+                  if os.path.basename(img) not in benchmark_names]
+    missing = [img for img in splittable
+               if os.path.basename(img) not in split_names]
+
+    if not missing:
+        return
+
+    print(f'\n  {len(missing)} imágenes nuevas detectadas fuera de los splits.')
+    print('  Regenerando train.txt / val.txt / test.txt ...')
+    data.generate_split(verbose=False)
+    print('  Splits actualizados.')
+
 
 # Un polígono necesita 3 puntos como mínimo, es decir 6 valores x,y detrás
 # del class_id.
@@ -219,7 +250,12 @@ def run(args):
         print(f'\n  {problems} problemas que corregir antes de entrenar.\n')
         return 1
 
-    print('\n  Dataset válido: listo para entrenar.\n')
+    print('\n  Dataset válido: listo para entrenar.')
+
+    # ---------------- actualizar splits si hay imágenes nuevas ----------------
+    _update_splits_if_needed(images)
+
+    print()
     return 0
 
 

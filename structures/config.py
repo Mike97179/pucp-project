@@ -30,7 +30,6 @@ BENCHMARK_TXT = os.path.join(DATASET_PATH, 'benchmark.txt')
 
 MODELS_DIR    = os.path.join(BASE_PATH, 'models')
 MODELS_CSV    = os.path.join(MODELS_DIR, 'models.csv')
-HISTORY_DIR   = os.path.join(MODELS_DIR, 'history')
 ARCHIVE_DIR   = os.path.join(MODELS_DIR, 'archive')
 DATASET_STATE = os.path.join(MODELS_DIR, 'dataset_state.txt')
 

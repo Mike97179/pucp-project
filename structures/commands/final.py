@@ -68,6 +68,50 @@ AUTO_BATCH = -1
 # oversampling se hace antes de entrenar y no queda en args.yaml.
 OVERSAMPLE_PATTERN = re.compile(r'oversample_(\d+)x')
 
+ARCH_SHORT = {
+    'yolov8n-seg.pt': 'yolo8n', 'yolov8s-seg.pt': 'yolo8s',
+    'yolo11n-seg.pt': 'yolo11n', 'yolo11s-seg.pt': 'yolo11s',
+}
+ORIGIN_SHORT = {True: 'colab', False: 'local'}
+
+
+def _suggest_name(args):
+    """
+    Build a descriptive name from the hyperparameters.
+
+    Format: {arch}_{imgsz}_{oversample}_{origin}
+    Example: yolo8s_800_3x_local
+    """
+    arch = ARCH_SHORT.get(args.model, args.model.replace('-seg.pt', ''))
+    over = f'{args.oversample}x' if args.oversample > OVERSAMPLE_OFF else '1x'
+    origin = ORIGIN_SHORT[config.IN_COLAB]
+    return f'{arch}_{args.imgsz}_{over}_{origin}'
+
+
+def _ask_name(args):
+    """
+    Show the suggested name and let the user accept (Enter) or edit it.
+
+    Uses readline so the suggestion appears as editable pre-filled text.
+    """
+    suggestion = _suggest_name(args)
+
+    if not sys.stdin.isatty():
+        return suggestion
+
+    try:
+        import readline
+        readline.set_startup_hook(lambda: readline.insert_text(suggestion))
+        try:
+            answer = input('\n  Nombre del modelo (edita o Enter para aceptar): ')
+        finally:
+            readline.set_startup_hook()
+    except ImportError:
+        answer = input(f'\n  Nombre del modelo [{suggestion}]: ')
+
+    name = answer.strip()
+    return name if name else suggestion
+
 
 def _describe_data(args):
     """Short summary of the data preparation, for the CSV column."""
@@ -215,7 +259,7 @@ def _reproduce_setup(args):
     """
     best      = _best_model()
     name      = best['name']
-    args_yaml = os.path.join(config.HISTORY_DIR, name, 'args.yaml')
+    args_yaml = os.path.join(models.model_dir(name), 'args.yaml')
 
     if not os.path.isfile(args_yaml):
         raise FileNotFoundError(
@@ -382,13 +426,12 @@ def run(args):
     _fill_defaults(args)
 
     class_names = config.load_class_names()
-    runs_path   = (os.path.join(config.BASE_PATH, args.output) if args.output
-                   else train.next_run_dir())
 
-    # Name reserved before training: if model_1..model_N already exist, this
-    # is the next free number and it clobbers none of them.
-    model_name = args.name or models.next_model_name()
+    # Name: from --name, or suggested from the config and editable by the user.
+    model_name = args.name or _ask_name(args)
     run_name   = model_name
+    runs_path  = (os.path.join(config.BASE_PATH, args.output) if args.output
+                  else config.MODELS_DIR)
 
     train.check_environment()
 
@@ -447,19 +490,21 @@ def run(args):
     df_classes = evaluate.per_class_metrics(metrics, class_names)
     print(df_classes.to_string(index=False))
 
-    metrics_csv = os.path.join(runs_path, 'per_class_metrics.csv')
+    run_dir = os.path.join(runs_path, run_name)
+
+    metrics_csv = os.path.join(run_dir, 'per_class_metrics.csv')
     df_classes.to_csv(metrics_csv, index=False)
     print(f'\nTabla guardada en: {metrics_csv}')
 
     plots.map_per_class(
         df_classes,
-        os.path.join(runs_path, 'per_class_metrics.png'),
+        os.path.join(run_dir, 'per_class_metrics.png'),
         title=f'mAP50 por clase — {model_name}')
 
     plots.confusion_matrix(
         evaluate.confusion_matrix(metrics),
         config.matrix_labels(class_names),
-        os.path.join(runs_path, 'confusion_matrix.png'),
+        os.path.join(run_dir, 'confusion_matrix.png'),
         title=f'Matriz de confusión — {model_name}')
 
     totals = evaluate.summary(metrics)
@@ -470,7 +515,6 @@ def run(args):
     _refresh_old_metrics()
 
     # ---------------- registration ----------------
-    run_dir = os.path.join(runs_path, run_name)
     print('\nDando de alta el modelo en el registro...')
     registered_before = _registered_names()
     final_path = models.register_new(
@@ -480,7 +524,7 @@ def run(args):
         data         = _describe_data(args),
         box_mAP50    = totals['mAP50_detection'],
         mask_mAP50   = totals['mAP50_segmentation'],
-        origin       = os.path.relpath(run_dir, config.BASE_PATH),
+        origin       = model_name,
         notes        = args.notes or '',
     )
 

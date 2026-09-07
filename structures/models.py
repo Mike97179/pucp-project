@@ -1,17 +1,17 @@
 """
 Registro de modelos entrenados.
 
-Cada script solía tener su propia lista hardcodeada de rutas runs_experimento_*/.
-Ahora los pesos viven en models/ y este módulo los descubre desde models.csv,
-así que borrar las carpetas runs* no rompe nada.
+Cada modelo vive en su propia carpeta models/<nombre>/ con los pesos, el
+historial de entrenamiento y cualquier salida que haya producido Ultralytics.
+Archivar un modelo es mover esa carpeta entera a models/archive/.
 
 Cada entrenamiento produce un modelo nuevo y numerado (model_1, model_2, ...):
 uno anterior nunca se sobreescribe. Los comandos que necesitan un modelo
 preguntan cuál usar, listando los disponibles.
 
 El registro es un leaderboard fijo de MAX_MODELS entradas ordenadas por
-mask_mAP50: cuando un modelo nuevo lo excede, el peor se archiva (pesos e
-historial van a models/archive/) en vez de borrarse.
+mask_mAP50: cuando un modelo nuevo lo excede, el peor se archiva en vez de
+borrarse.
 """
 
 import os
@@ -146,12 +146,11 @@ def next_model_name():
         for file in os.listdir(config.MODELS_DIR):
             note(os.path.splitext(file)[0])
 
-    if os.path.isdir(config.HISTORY_DIR):
-        for folder in os.listdir(config.HISTORY_DIR):
-            note(folder)
+    if os.path.isdir(config.MODELS_DIR):
+        for entry in os.listdir(config.MODELS_DIR):
+            if os.path.isdir(os.path.join(config.MODELS_DIR, entry)):
+                note(entry)
 
-    # El archivo tambien cuenta: un modelo archivado sigue existiendo, asi que
-    # su numero no se reutiliza aunque ya no este en el CSV.
     if os.path.isdir(config.ARCHIVE_DIR):
         for entry in os.listdir(config.ARCHIVE_DIR):
             note(os.path.splitext(entry)[0])
@@ -168,9 +167,14 @@ def _recompute_rank(df):
     return df.sort_values('rank').reset_index(drop=True)
 
 
+def model_dir(name):
+    """Carpeta de un modelo: models/<nombre>/."""
+    return os.path.join(config.MODELS_DIR, name)
+
+
 def save_history(name, run_dir):
-    """Copia lo que dejó el entrenamiento a models/history/<nombre>/."""
-    target = os.path.join(config.HISTORY_DIR, name)
+    """Copia los archivos clave del entrenamiento a models/<nombre>/."""
+    target = model_dir(name)
     os.makedirs(target, exist_ok=True)
 
     copied = 0
@@ -196,10 +200,11 @@ def register_new(name, weights, run_dir=None, **fields):
     models/<nombre>.pt normalmente, la ruta del archivo si no entró al
     leaderboard, o None si el usuario decidió descartarlo.
     """
-    os.makedirs(config.MODELS_DIR, exist_ok=True)
+    mdir = model_dir(name)
+    os.makedirs(mdir, exist_ok=True)
 
-    file_name = f'{name}.pt'
-    target    = os.path.join(config.MODELS_DIR, file_name)
+    pt_name  = f'{name}.pt'
+    target   = os.path.join(mdir, pt_name)
     if os.path.exists(target):
         raise FileExistsError(
             f'Ya existe {target}. Los modelos no se sobrescriben: borra ese '
@@ -207,13 +212,13 @@ def register_new(name, weights, run_dir=None, **fields):
 
     shutil.copy2(weights, target)
 
-    if run_dir:
+    if run_dir and os.path.normpath(run_dir) != os.path.normpath(mdir):
         folder, copied = save_history(name, run_dir)
         print(f'  Historial ({copied} archivos): {folder}')
 
     row = {c: fields.get(c, '') for c in CSV_COLUMNS}
     row['name'] = name
-    row['file'] = file_name
+    row['file'] = os.path.join(name, pt_name)
 
     if os.path.isfile(config.MODELS_CSV):
         df = pd.read_csv(config.MODELS_CSV)
@@ -277,35 +282,38 @@ def _move_without_overwriting(source, target):
     return target
 
 
+def _clean_all_outputs(name):
+    """Remove every trace of a model outside models/: predictions, benchmark,
+    matrices and analyze outputs."""
+    from .commands.analyze import clean_model_outputs
+    from .commands.predict import clean_model_predictions
+    from .commands.benchmark import clean_model_benchmark
+    from .commands.matrices import clean_model_matrices
+
+    clean_model_outputs(name)
+    clean_model_predictions(name)
+    clean_model_benchmark(name)
+    clean_model_matrices(name)
+
+
 def archive_model(name):
     """
-    Saca un modelo del leaderboard sin perderlo: los pesos van a
-    models/archive/, la carpeta models/history/<nombre>/ a
-    models/archive/<nombre>/, y su fila desaparece de models.csv.
+    Saca un modelo del leaderboard sin perderlo: mueve models/<nombre>/
+    entera a models/archive/<nombre>/ y su fila desaparece de models.csv.
 
-    Retorna la ruta de los pesos archivados, o None si no había.
+    Retorna la ruta de la carpeta archivada, o None si no había.
     """
     os.makedirs(config.ARCHIVE_DIR, exist_ok=True)
 
-    file_name = _weights_file(name)
-    archived  = None
+    mdir     = model_dir(name)
+    archived = None
 
-    weights = os.path.join(config.MODELS_DIR, file_name)
-    if os.path.isfile(weights):
+    if os.path.isdir(mdir):
         archived = _move_without_overwriting(
-            weights, os.path.join(config.ARCHIVE_DIR, file_name))
-
-    history = os.path.join(config.HISTORY_DIR, name)
-    if os.path.isdir(history):
-        _move_without_overwriting(
-            history, os.path.join(config.ARCHIVE_DIR, name))
+            mdir, os.path.join(config.ARCHIVE_DIR, name))
 
     _drop_from_csv(name)
-
-    # Eliminar las predicciones de analyze/output/ de este modelo:
-    # al salir del leaderboard sus resultados dejan de ser útiles.
-    from .commands.analyze import clean_model_outputs
-    clean_model_outputs(name)
+    _clean_all_outputs(name)
 
     print(f'  Archivado "{name}" en {config.ARCHIVE_DIR}')
     return archived
@@ -313,24 +321,18 @@ def archive_model(name):
 
 def discard_model(name):
     """
-    Elimina un modelo definitivamente: pesos, carpeta de historial y fila
-    en models.csv.
+    Elimina un modelo definitivamente: toda su carpeta y su fila en
+    models.csv.
 
     Solo se usa cuando el usuario lo pide explícitamente — archivar es lo
     que se hace por defecto.
     """
-    weights = os.path.join(config.MODELS_DIR, _weights_file(name))
-    if os.path.isfile(weights):
-        os.remove(weights)
-
-    history = os.path.join(config.HISTORY_DIR, name)
-    if os.path.isdir(history):
-        shutil.rmtree(history)
+    mdir = model_dir(name)
+    if os.path.isdir(mdir):
+        shutil.rmtree(mdir)
 
     _drop_from_csv(name)
-
-    from .commands.analyze import clean_model_outputs
-    clean_model_outputs(name)
+    _clean_all_outputs(name)
 
     print(f'  Descartado "{name}": no se guardó nada.')
 
