@@ -9,10 +9,10 @@ __pycache__/
 .env
 
 # ------------------------------------------------------------------
-# Pesos y datos: nada de esto va al repositorio
+# Modelos base de YOLO (pretrained): pesan mucho y se descargan solos
 # ------------------------------------------------------------------
-# Modelos entrenados y checkpoints base (yolov8*-seg.pt)
-# *.pt
+/yolo*.pt
+
 # Cache de anotaciones de Ultralytics (dataset/labels.cache)
 *.cache
 # Salida cruda de los entrenamientos
@@ -28,7 +28,6 @@ dataset/*
 # ------------------------------------------------------------------
 # benchmark_results/  -> `benchmark` (74 MB de JPEG de predicciones)
 # confusion_matrices/ -> `matrices`
-# models/history/     -> curvas y matrices que copia `train`
 *.jpg
 *.jpeg
 *.png
@@ -39,11 +38,12 @@ dataset/*
 *.tiff
 
 # ------------------------------------------------------------------
-# Lo que sí se sube de las carpetas de resultados
+# Lo que sí se sube de models/
 # ------------------------------------------------------------------
-# benchmark_results/*.xlsx  tabla comparativa
-# models/models.csv         el registro (leaderboard de 5)
-# models/history/*/         results.csv y args.yaml de cada entrenamiento
+# models/models.csv             el registro (leaderboard de 5)
+# models/<nombre>/args.yaml     configuración de cada entrenamiento
+# models/<nombre>/results.csv   curvas de entrenamiento
+# models/dataset_state.txt      fingerprint del dataset
 
 # ------------------------------------------------------------------
 # Sistema operativo y editores
