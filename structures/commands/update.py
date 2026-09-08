@@ -1,15 +1,15 @@
 """
-`update` command — registers a model trained in Colab.
+`update` command — registers models trained in Colab.
 
 When training happens in Colab, the notebook saves its outputs to a folder in
 Drive: weights, training history, and a registrar.txt snippet with the metrics
-and metadata.  The user downloads that folder, places it inside models/, and
-runs this command.
+and metadata.  The user downloads those folders, places them inside models/,
+and runs this command.
 
 The command scans models/ for folders that have a registrar.txt but are not yet
 in models.csv, parses the metrics, lets the user confirm or edit the name, and
-registers the model into the leaderboard — the same as if it had been trained
-locally.
+registers each model into the leaderboard — the same as if it had been trained
+locally.  Multiple folders are processed in sequence.
 """
 
 import ast
@@ -35,7 +35,8 @@ def _parse_registrar(path):
 
     match = re.search(r'register_new\((.*)\)', text, re.DOTALL)
     if not match:
-        sys.exit(f'ERROR: no se encontró register_new() en {path}')
+        print(f'  ERROR: no se encontró register_new() en {path}')
+        return None, None
 
     body = match.group(1)
 
@@ -77,17 +78,15 @@ def _find_weights(folder, hint=None):
         return os.path.join(folder, pts[0])
     if len(pts) > 1:
         print(f'  Archivos .pt encontrados: {pts}')
-        sys.exit(f'ERROR: hay más de un .pt en {folder}. '
-                 f'Indica cuál usar con --weights.')
-    sys.exit(f'ERROR: no se encontró ningún .pt en {folder}.')
+        print(f'  ERROR: hay más de un .pt en {folder}.')
+        return None
+    print(f'  ERROR: no se encontró ningún .pt en {folder}.')
+    return None
 
 
-def _find_pending_folder():
+def _find_pending_folders():
     """
-    Scan models/ for a folder with registrar.txt that is not in models.csv.
-
-    Returns the folder path, or exits with an error if none or more than one
-    are found.
+    Scan models/ for folders with registrar.txt that are not in models.csv.
     """
     registered = set()
     if os.path.isfile(config.MODELS_CSV):
@@ -96,26 +95,14 @@ def _find_pending_folder():
     skip = {'archive', '__pycache__'}
     pending = []
 
-    for entry in os.listdir(config.MODELS_DIR):
+    for entry in sorted(os.listdir(config.MODELS_DIR)):
         if entry in skip or entry in registered:
             continue
         full = os.path.join(config.MODELS_DIR, entry)
         if os.path.isdir(full) and os.path.isfile(os.path.join(full, 'registrar.txt')):
             pending.append(full)
 
-    if not pending:
-        sys.exit('No se encontró ninguna carpeta nueva con registrar.txt en '
-                 f'{config.MODELS_DIR}.\n'
-                 f'Coloca la carpeta descargada de Colab dentro de models/ '
-                 f'y vuelve a ejecutar este comando.')
-
-    if len(pending) > 1:
-        names = [os.path.basename(p) for p in pending]
-        sys.exit(f'Hay más de una carpeta pendiente de registrar: {names}\n'
-                 f'Registra una a la vez: mueve las demás fuera de models/ '
-                 f'temporalmente.')
-
-    return pending[0]
+    return pending
 
 
 def _ask_name(suggestion):
@@ -143,48 +130,53 @@ def _registered_names():
     return set(pd.read_csv(config.MODELS_CSV)['name'].astype(str))
 
 
-def run(args):
-    folder = os.path.abspath(args.folder) if args.folder else _find_pending_folder()
+def _register_folder(folder, name_override=None):
+    """
+    Register a single Colab folder into the leaderboard.
 
-    if not os.path.isdir(folder):
-        sys.exit(f'ERROR: no existe la carpeta {folder}')
-
-    registrar = os.path.join(folder, 'registrar.txt')
-    if not os.path.isfile(registrar):
-        sys.exit(f'ERROR: no se encontró registrar.txt en {folder}\n'
-                 f'El notebook de Colab genera este archivo con las métricas '
-                 f'y metadatos del modelo.')
-
+    Returns True on success, False if the folder could not be processed.
+    """
     folder_name = os.path.basename(folder)
-    print(f'Carpeta detectada: {folder_name}/')
+    registrar = os.path.join(folder, 'registrar.txt')
+
+    if not os.path.isfile(registrar):
+        print(f'  Sin registrar.txt — se omite.')
+        return False
 
     fields, pt_hint = _parse_registrar(registrar)
+    if fields is None:
+        return False
+
     weights_path = _find_weights(folder, pt_hint)
+    if weights_path is None:
+        return False
     weights_name = os.path.basename(weights_path)
 
     for key in ('box_mAP50', 'mask_mAP50'):
         if key not in fields:
-            sys.exit(f'ERROR: falta "{key}" en registrar.txt')
+            print(f'  ERROR: falta "{key}" en registrar.txt — se omite.')
+            return False
 
-    print(f'\nMétricas del modelo:')
-    print(f'  box_mAP50  : {fields["box_mAP50"]}')
-    print(f'  mask_mAP50 : {fields["mask_mAP50"]}')
+    print(f'\n  Métricas:')
+    print(f'    box_mAP50  : {fields["box_mAP50"]}')
+    print(f'    mask_mAP50 : {fields["mask_mAP50"]}')
     if 'architecture' in fields:
-        print(f'  Arquitectura: {fields["architecture"]}')
+        print(f'    Arquitectura: {fields["architecture"]}')
     if 'imgsz' in fields:
-        print(f'  Resolución  : {fields["imgsz"]}')
+        print(f'    Resolución  : {fields["imgsz"]}')
     if 'data' in fields:
-        print(f'  Data        : {fields["data"]}')
+        print(f'    Data        : {fields["data"]}')
 
     origin = fields.get('origin', os.path.splitext(pt_hint or folder_name)[0])
-    suggestion = args.name or origin
+    suggestion = name_override or origin
     model_name = _ask_name(suggestion)
 
-    # Rename folder if the chosen name differs from the current folder name
+    # Rename folder if the chosen name differs
     if model_name != folder_name:
         new_folder = os.path.join(config.MODELS_DIR, model_name)
         if os.path.exists(new_folder):
-            sys.exit(f'ERROR: ya existe {new_folder}. Elige otro nombre.')
+            print(f'  ERROR: ya existe {new_folder}. Elige otro nombre.')
+            return False
         os.rename(folder, new_folder)
         folder = new_folder
         print(f'  Carpeta renombrada: {folder_name}/ -> {model_name}/')
@@ -195,23 +187,12 @@ def run(args):
         old_pt = os.path.join(folder, weights_name)
         new_pt = os.path.join(folder, pt_target)
         if os.path.exists(new_pt):
-            sys.exit(f'ERROR: ya existe {new_pt}.')
+            print(f'  ERROR: ya existe {new_pt}.')
+            return False
         os.rename(old_pt, new_pt)
         print(f'  Pesos renombrados: {weights_name} -> {pt_target}')
 
-    # Re-evaluate existing models if the dataset changed
-    if os.path.isfile(config.MODELS_CSV) and models.needs_reevaluation():
-        print('\n' + '=' * 70)
-        print(' EL DATASET CAMBIÓ DESDE LA ÚLTIMA EVALUACIÓN')
-        print('=' * 70)
-        print(f'  Imágenes ahora: {models.dataset_fingerprint()}   '
-              f'(antes: {models.saved_fingerprint()})')
-        print('  Las métricas guardadas se midieron sobre otro test set.')
-        print('  Re-evaluando los modelos ya registrados...')
-        models.reevaluate_all(split='test')
-
     # Add row to CSV and enforce leaderboard
-    print('\nRegistrando el modelo...')
     registered_before = _registered_names()
 
     csv_fields = {k: v for k, v in fields.items()
@@ -235,30 +216,12 @@ def run(args):
     df[models.CSV_COLUMNS].to_csv(config.MODELS_CSV, index=False)
     models.save_fingerprint()
 
-    print(f'  Registrado como "{model_name}" en {config.MODELS_CSV}')
+    print(f'  Registrado como "{model_name}"')
 
     final_path = models._enforce_leaderboard(
         model_name, os.path.join(folder, pt_target))
 
     registered_after = _registered_names()
-
-    # Leaderboard report
-    print('\n' + '=' * 70)
-    print(f' LEADERBOARD — top {models.MAX_MODELS} por mask_mAP50')
-    print('=' * 70)
-
-    try:
-        df = models.registry()
-        cols = [c for c in ('rank', 'name', 'architecture', 'imgsz',
-                            'data', 'box_mAP50', 'mask_mAP50')
-                if c in df.columns]
-        table = df.sort_values('rank').reset_index(drop=True)
-        display = table[cols].copy()
-        display['   '] = ['<-- nuevo' if n == model_name else ''
-                          for n in table['name']]
-        print(display.to_string(index=False))
-    except FileNotFoundError:
-        pass
 
     displaced = sorted(registered_before - registered_after - {model_name})
     if model_name in registered_after:
@@ -266,8 +229,6 @@ def run(args):
             print(f'\n  "{model_name}" entró al top {models.MAX_MODELS} y '
                   f'desplazó a "{name}".')
             print(f'  "{name}" quedó archivado en {config.ARCHIVE_DIR}.')
-        print(f'\n  "{model_name}" ya disponible en `models`, `benchmark`, '
-              f'`matrices` y `predict`.')
     else:
         print(f'\n  "{model_name}" NO entró al top {models.MAX_MODELS}.')
         if final_path:
@@ -281,16 +242,72 @@ def run(args):
     if os.path.isfile(reg_path):
         os.remove(reg_path)
 
+    return True
+
+
+def run(args):
+    if args.folder:
+        folders = [os.path.abspath(args.folder)]
+    else:
+        folders = _find_pending_folders()
+
+    if not folders:
+        sys.exit('No se encontró ninguna carpeta nueva con registrar.txt en '
+                 f'{config.MODELS_DIR}.\n'
+                 f'Coloca la carpeta descargada de Colab dentro de models/ '
+                 f'y vuelve a ejecutar este comando.')
+
+    print(f'Carpetas pendientes de registrar: {len(folders)}')
+    for f in folders:
+        print(f'  {os.path.basename(f)}/')
+
+    # Re-evaluate existing models once if the dataset changed
+    if os.path.isfile(config.MODELS_CSV) and models.needs_reevaluation():
+        print('\n' + '=' * 70)
+        print(' EL DATASET CAMBIÓ DESDE LA ÚLTIMA EVALUACIÓN')
+        print('=' * 70)
+        print(f'  Imágenes ahora: {models.dataset_fingerprint()}   '
+              f'(antes: {models.saved_fingerprint()})')
+        print('  Las métricas guardadas se midieron sobre otro test set.')
+        print('  Re-evaluando los modelos ya registrados...')
+        models.reevaluate_all(split='test')
+
+    registered = 0
+    for i, folder in enumerate(folders, 1):
+        print('\n' + '=' * 70)
+        print(f' [{i}/{len(folders)}] {os.path.basename(folder)}/')
+        print('=' * 70)
+
+        if _register_folder(folder, name_override=args.name if len(folders) == 1 else None):
+            registered += 1
+
+    # Final leaderboard
+    print('\n' + '=' * 70)
+    print(f' LEADERBOARD — top {models.MAX_MODELS} por mask_mAP50')
+    print('=' * 70)
+
+    try:
+        df = models.registry()
+        cols = [c for c in ('rank', 'name', 'architecture', 'imgsz',
+                            'data', 'box_mAP50', 'mask_mAP50')
+                if c in df.columns]
+        table = df.sort_values('rank').reset_index(drop=True)
+        print(table[cols].to_string(index=False))
+    except FileNotFoundError:
+        pass
+
+    print(f'\nModelos registrados: {registered}/{len(folders)}')
+
 
 def register(subparsers):
     p = subparsers.add_parser(
         'update',
-        help='Registra un modelo entrenado en Colab desde su carpeta en models/')
+        help='Registra modelos entrenados en Colab desde sus carpetas en models/')
     p.add_argument('folder', nargs='?', default=None,
                    help='Carpeta dentro de models/ con los pesos y '
-                        'registrar.txt (si se omite, se detecta automáticamente)')
+                        'registrar.txt (si se omite, se detectan todas '
+                        'las pendientes)')
     p.add_argument('--name', default=None,
-                   help='Nombre del modelo (si se omite, se sugiere desde '
-                        'registrar.txt y se puede editar)')
+                   help='Nombre del modelo (solo cuando se registra uno)')
     p.set_defaults(func=run)
     return p

@@ -1,6 +1,6 @@
 rank,name,file,architecture,imgsz,data,box_mAP50,mask_mAP50,origin,notes
-1,yolo8s_800_1x_local_450imgs,yolo8s_800_1x_local_450imgs/yolo8s_800_1x_local_450imgs.pt,yolov8s-seg,800,base,0.5797,0.5358,yolo8s_800_1x_local_450imgs,
-2,v8s_800_colab,v8s_800_colab/yolov8s_800_over3x_colab.pt,yolov8s-seg,800,oversample_3x,0.5674,0.5259,v8s_800_colab,Recomendado: mejor mask_mAP50 del registro. Entrenado en Colab
-3,yolo11s_800_colab,yolo11s_800_colab/yolo11s_800_over3x_colab.pt,yolo11s-seg,800,oversample_3x,0.566,0.5236,yolo11s_800_colab,Empata con el 1 dentro del ruido y pesa 14% menos
-4,v8s_800_local,v8s_800_local/yolov8s_800_over3x_local.pt,yolov8s-seg,800,oversample_3x,0.5599,0.507,v8s_800_local,Misma config que el 1 pero entrenado en local
-5,v8s_640,v8s_640/yolov8s_640_over3x.pt,yolov8s-seg,640,oversample_3x,0.5424,0.4806,v8s_640,Identico a res_640 del experimento de resolucion
+1,v8s_800_over1x_colab_450imgs,v8s_800_over1x_colab_450imgs/v8s_800_over1x_colab_450imgs.pt,yolov8s-seg,800,oversample_1x,0.5981,0.5454,v8s_800_over1x_colab_450imgs,Entrenado en Colab
+2,v8s_800_over3x_colab_450imgs,v8s_800_over3x_colab_450imgs/v8s_800_over3x_colab_450imgs.pt,yolov8s-seg,800,oversample_3x,0.5774,0.5415,v8s_800_over3x_colab_450imgs,Entrenado en Colab
+3,yolo8s_800_1x_local_450imgs,yolo8s_800_1x_local_450imgs/yolo8s_800_1x_local_450imgs.pt,yolov8s-seg,800,base,0.5797,0.5358,yolo8s_800_1x_local_450imgs,
+4,v8s_800_colab,v8s_800_colab/yolov8s_800_over3x_colab.pt,yolov8s-seg,800,oversample_3x,0.5674,0.5259,v8s_800_colab,Recomendado: mejor mask_mAP50 del registro. Entrenado en Colab
+5,yolo11s_800_colab,yolo11s_800_colab/yolo11s_800_over3x_colab.pt,yolo11s-seg,800,oversample_3x,0.566,0.5236,yolo11s_800_colab,Empata con el 1 dentro del ruido y pesa 14% menos
