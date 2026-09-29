@@ -1,6 +1,5 @@
 rank,name,file,architecture,imgsz,data,box_mAP50,mask_mAP50,origin,notes
 1,v8s_1200_over1x_colab_500imgs,v8s_1200_over1x_colab_500imgs/v8s_1200_over1x_colab_500imgs.pt,yolov8s-seg,1200,oversample_1x,0.5733,0.559,v8s_1200_over1x_colab_500imgs,Entrenado en Colab
 2,v8s_800_over1x_colab_450imgs,v8s_800_over1x_colab_450imgs/v8s_800_over1x_colab_450imgs.pt,yolov8s-seg,800,oversample_1x,0.5981,0.5454,v8s_800_over1x_colab_450imgs,Entrenado en Colab
-3,v8s_800_over3x_colab_450imgs,v8s_800_over3x_colab_450imgs/v8s_800_over3x_colab_450imgs.pt,yolov8s-seg,800,oversample_3x,0.5774,0.5415,v8s_800_over3x_colab_450imgs,Entrenado en Colab
-4,v8s_800_over3x_colab_450imgs_test,v8s_800_over3x_colab_450imgs_test/v8s_800_over3x_colab_450imgs_test.pt,yolov8s-seg,800,oversample_3x,0.5774,0.5415,v8s_800_over3x_colab_450imgs,Entrenado en Colab
-5,yolo8s_800_1x_local_seed18,yolo8s_800_1x_local_seed18/yolo8s_800_1x_local_seed18.pt,yolov8s-seg,800,base,0.5877,0.5375,yolo8s_800_1x_local_seed18,
+3,v8s_800_over3x_colab_450imgs_test,v8s_800_over3x_colab_450imgs_test/v8s_800_over3x_colab_450imgs_test.pt,yolov8s-seg,800,oversample_3x,0.5774,0.5415,v8s_800_over3x_colab_450imgs,Entrenado en Colab
+4,yolo8s_800_1x_local_seed18,yolo8s_800_1x_local_seed18/yolo8s_800_1x_local_seed18.pt,yolov8s-seg,800,base,0.5877,0.5375,yolo8s_800_1x_local_seed18,
