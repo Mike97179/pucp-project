@@ -25,8 +25,8 @@ def run(args):
     print(f'Patience      : {args.epochs} (igual a épocas, para ver la curva '
           f'completa)')
 
-    print('\nGenerando split train/val/test (semilla fija)...')
-    data.generate_split(seed=args.seed)
+    print(f'\nGenerando split train/val/test (semilla: {config.SEED})...')
+    data.generate_split(seed=config.SEED)
 
     train.train(
         run_name  = run_name,
@@ -36,7 +36,7 @@ def run(args):
         batch     = args.batch,
         lr0       = args.lr0,
         patience  = args.epochs,   # do not stop early: we want the whole curve
-        seed      = args.seed,
+        seed      = config.SEED,
     )
 
     results_csv = os.path.join(runs_path, run_name, 'results.csv')
@@ -74,6 +74,5 @@ def register(subparsers):
     p.add_argument('--lr0', type=float, default=config.LR0)
     p.add_argument('--imgsz', type=int, default=config.IMGSZ)
     p.add_argument('--batch', type=int, default=config.BATCH)
-    p.add_argument('--seed', type=int, default=config.SEED)
     p.set_defaults(func=run)
     return p

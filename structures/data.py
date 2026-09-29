@@ -65,10 +65,88 @@ def benchmark_paths(benchmark_txt=config.BENCHMARK_TXT, img_dir=config.IMG_DIR):
     return paths, missing
 
 
-def generate_split(seed=config.SEED, ratio=config.SPLIT_RATIO,
+def _split_once(images, seed, ratio):
+    """Shuffle and partition without writing files."""
+    shuffled = list(images)
+    random.seed(seed)
+    random.shuffle(shuffled)
+
+    n = len(shuffled)
+    n_train = int(n * ratio[0])
+    n_val   = int(n * ratio[1])
+
+    return (shuffled[:n_train],
+            shuffled[n_train:n_train + n_val],
+            shuffled[n_train + n_val:])
+
+
+def _score_split(train, val, test, n_classes, ratio):
+    """
+    How far off this split is from the target ratio, per class.
+
+    Returns (valid, score).  valid is False when any class has 0 instances
+    in any split.  score is the sum of squared deviations from the target
+    percentage across all classes and splits — lower is better.
+    """
+    splits  = [train, val, test]
+    counts  = [count_instances(s, n_classes) for s in splits]
+    totals  = [sum(c[i] for c in counts) for i in range(n_classes)]
+
+    score = 0.0
+    for i in range(n_classes):
+        if totals[i] == 0:
+            continue
+        for j, target in enumerate(ratio):
+            actual = counts[j][i] / totals[i]
+            if counts[j][i] == 0:
+                return False, float('inf')
+            score += (actual - target) ** 2
+
+    return True, score
+
+
+def find_best_seed(ratio=config.SPLIT_RATIO, max_seeds=1000, verbose=True):
+    """
+    Try seeds 0..max_seeds and return the one whose per-class distribution
+    is closest to the target ratio, with no class at 0 in any split.
+    """
+    images = list_images()
+    benchmark = read_benchmark_names()
+    if benchmark:
+        images = [i for i in images
+                  if os.path.basename(i) not in benchmark]
+
+    class_names = config.load_class_names()
+    n_classes = len(class_names)
+
+    best_seed  = 0
+    best_score = float('inf')
+    valid_count = 0
+
+    for seed in range(max_seeds):
+        train, val, test = _split_once(images, seed, ratio)
+        valid, score = _score_split(train, val, test, n_classes, ratio)
+        if valid and score < best_score:
+            best_seed  = seed
+            best_score = score
+            valid_count += 1
+
+    if verbose:
+        print(f'  Semillas evaluadas: {max_seeds}')
+        print(f'  Semillas válidas (todas las clases en cada split): '
+              f'{valid_count}')
+        print(f'  Mejor semilla: {best_seed} (desviación: {best_score:.6f})')
+
+    return best_seed
+
+
+def generate_split(seed=None, ratio=config.SPLIT_RATIO,
                    exclude_benchmark=True, verbose=True):
     """
     Split the images into train/val/test and write the three .txt files.
+
+    When seed is None, the best seed is found automatically.  When a seed
+    is given explicitly, it is used directly.
 
     The images in benchmark.txt are excluded so they never land in any split:
     they are only used for visual comparison between models.
@@ -87,6 +165,11 @@ def generate_split(seed=config.SEED, ratio=config.SPLIT_RATIO,
             if verbose:
                 print(f'  Imágenes de benchmark excluidas: {len(benchmark)}')
 
+    if seed is None:
+        if verbose:
+            print(f'\n  Buscando la mejor semilla...')
+        seed = find_best_seed(ratio=ratio, verbose=verbose)
+
     random.seed(seed)
     random.shuffle(images)
 
@@ -99,8 +182,10 @@ def generate_split(seed=config.SEED, ratio=config.SPLIT_RATIO,
     test  = images[n_train + n_val:]
 
     write_split(train, val, test)
+    config.save_seed(seed)
 
     if verbose:
+        print(f'\n  Semilla seleccionada: {seed}')
         print(f'  train: {len(train)} imágenes')
         print(f'  val  : {len(val)} imágenes')
         print(f'  test : {len(test)} imágenes')
@@ -195,7 +280,7 @@ def apply_oversampling(train_imgs, class_names, max_factor=3,
     return result
 
 
-def restore_split(seed=config.SEED, verbose=True):
+def restore_split(verbose=True):
     """
     Rewrite train.txt without repetitions.
 
@@ -203,6 +288,6 @@ def restore_split(seed=config.SEED, verbose=True):
     halfway, train.txt is left with repeated lines and the next training run
     would silently use oversampling.
     """
-    generate_split(seed=seed, verbose=verbose)
+    generate_split(seed=config.SEED, verbose=verbose)
     if verbose:
         print('train.txt restaurado al split original.')

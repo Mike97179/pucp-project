@@ -234,10 +234,6 @@ def register_new(name, weights, run_dir=None, **fields):
 
     print(f'  Registrado como "{name}" en {config.MODELS_CSV}')
 
-    # Las metricas recien calculadas corresponden al dataset actual: se deja
-    # constancia para que `needs_reevaluation()` sepa contra que comparar.
-    save_fingerprint()
-
     return _enforce_leaderboard(name, target)
 
 
@@ -397,110 +393,6 @@ def _enforce_leaderboard(new_name=None, new_path=None):
     return new_path
 
 
-# ------------------------------------------------------------------
-# Cambios en el dataset y re-evaluación
-# ------------------------------------------------------------------
-def dataset_fingerprint(img_dir=config.IMG_DIR):
-    """
-    Número total de imágenes en el dataset.
-
-    Sustituto barato de un hash de contenido: lo que importa es detectar
-    que el dataset creció (imágenes recién anotadas), porque desde ese
-    momento las métricas de models.csv vienen de un test set diferente.
-    """
-    return len(data.list_images(img_dir))
-
-
-def save_fingerprint(value=None, state_file=config.DATASET_STATE):
-    """
-    Escribe el fingerprint actual en models/dataset_state.txt.
-
-    Se llama cuando las métricas almacenadas coinciden con el dataset en
-    disco: después de registrar un modelo nuevo y después de reevaluate_all().
-    """
-    if value is None:
-        value = dataset_fingerprint()
-
-    os.makedirs(os.path.dirname(state_file), exist_ok=True)
-    with open(state_file, 'w') as f:
-        f.write(f'{value}\n')
-
-    return value
-
-
-def saved_fingerprint(state_file=config.DATASET_STATE):
-    """Fingerprint guardado la última vez que las métricas estuvieron al día."""
-    if not os.path.isfile(state_file):
-        return None
-    try:
-        with open(state_file) as f:
-            return int(f.read().strip())
-    except ValueError:
-        return None
-
-
-def needs_reevaluation(img_dir=config.IMG_DIR,
-                       state_file=config.DATASET_STATE):
-    """
-    True cuando el dataset cambió desde que se calcularon las métricas de
-    models.csv, así que el ranking no es confiable hasta que corra
-    reevaluate_all().
-
-    Sin fingerprint guardado todavía no hay contra qué comparar y retorna
-    False: la primera evaluación lo escribe.
-    """
-    stored = saved_fingerprint(state_file)
-    return stored is not None and stored != dataset_fingerprint(img_dir)
-
-
-def reevaluate_all(split='test'):
-    """
-    Re-ejecuta model.val() sobre cada modelo registrado y actualiza box_mAP50
-    y mask_mAP50 en models.csv, recalculando los ranks y el fingerprint.
-
-    Las filas cuyos pesos no estén en disco se dejan intactas en vez de
-    eliminarse. Retorna el DataFrame actualizado.
-    """
-    # Importado aquí y no arriba: evaluate carga torch y ultralytics, y este
-    # módulo lo importa cada comando del CLI.
-    from . import evaluate
-
-    if not os.path.isfile(config.MODELS_CSV):
-        raise FileNotFoundError(f'No existe {config.MODELS_CSV}.')
-
-    df = pd.read_csv(config.MODELS_CSV)
-    if df.empty:
-        print('No hay modelos registrados que re-evaluar.')
-        return df
-
-    print(f'\nRe-evaluando {len(df)} modelos sobre el split "{split}"...')
-
-    for position, (index, row) in enumerate(df.iterrows(), start=1):
-        name    = row['name']
-        weights = os.path.join(config.MODELS_DIR, str(row['file']))
-
-        if not os.path.isfile(weights):
-            print(f'\n  [{position}/{len(df)}] {name}: faltan los pesos '
-                  f'({row["file"]}) — se deja como está.')
-            continue
-
-        print(f'\n  [{position}/{len(df)}] {name}')
-        totals = evaluate.summary(evaluate.validate(weights, split=split))
-        df.at[index, 'box_mAP50']  = totals['mAP50_detection']
-        df.at[index, 'mask_mAP50'] = totals['mAP50_segmentation']
-        print(f'      box mAP50: {totals["mAP50_detection"]:.4f}   '
-              f'mask mAP50: {totals["mAP50_segmentation"]:.4f}')
-        evaluate.free_memory()
-
-    df = _recompute_rank(df)
-    df[CSV_COLUMNS].to_csv(config.MODELS_CSV, index=False)
-    save_fingerprint()
-
-    print(f'\nMétricas actualizadas en {config.MODELS_CSV}\n')
-    print(df[_visible_columns(df)].to_string(index=False))
-    print()
-
-    return df
 
 
 # ------------------------------------------------------------------

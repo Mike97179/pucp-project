@@ -31,7 +31,6 @@ BENCHMARK_TXT = os.path.join(DATASET_PATH, 'benchmark.txt')
 MODELS_DIR    = os.path.join(BASE_PATH, 'models')
 MODELS_CSV    = os.path.join(MODELS_DIR, 'models.csv')
 ARCHIVE_DIR   = os.path.join(MODELS_DIR, 'archive')
-DATASET_STATE = os.path.join(MODELS_DIR, 'dataset_state.txt')
 
 BENCHMARK_OUTPUT = os.path.join(BASE_PATH, 'benchmark_results')
 MATRICES_OUTPUT  = os.path.join(BASE_PATH, 'confusion_matrices')
@@ -45,7 +44,23 @@ IMG_EXTENSIONS = ('*.jpg', '*.jpeg', '*.png', '*.bmp', '*.tif', '*.tiff')
 # ------------------------------------------------------------------
 # Hiperparámetros por defecto
 # ------------------------------------------------------------------
-SEED        = 42
+_SEED_FILE  = os.path.join(DATASET_PATH, 'split_seed.txt')
+_DEFAULT_SEED = 42
+
+def _read_seed():
+    if os.path.isfile(_SEED_FILE):
+        try:
+            return int(open(_SEED_FILE).read().strip())
+        except (ValueError, OSError):
+            pass
+    return _DEFAULT_SEED
+
+SEED = _read_seed()
+
+
+def save_seed(seed):
+    with open(_SEED_FILE, 'w') as f:
+        f.write(str(seed))
 IMGSZ       = 640
 BATCH       = 8
 EPOCHS      = 70

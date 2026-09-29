@@ -316,29 +316,6 @@ def _registered_names():
     return set(pd.read_csv(config.MODELS_CSV)['name'].astype(str))
 
 
-def _refresh_old_metrics():
-    """
-    Re-evaluate the already registered models when the dataset changed.
-
-    Their mask_mAP50 in models.csv was measured on an older test set, so
-    ranking the new model against them would compare figures that do not come
-    from the same data.
-    """
-    if not os.path.isfile(config.MODELS_CSV):
-        return
-    if not models.needs_reevaluation():
-        return
-
-    print('\n' + '=' * 70)
-    print(' EL DATASET CAMBIÓ DESDE LA ÚLTIMA EVALUACIÓN')
-    print('=' * 70)
-    print(f'  Imágenes ahora: {models.dataset_fingerprint()}   '
-          f'(antes: {models.saved_fingerprint()})')
-    print('  Las métricas guardadas se midieron sobre otro conjunto de test,')
-    print('  así que no son comparables con las del modelo nuevo.')
-    print('  Re-evaluando los modelos ya registrados...')
-
-    models.reevaluate_all(split='test')
 
 
 def _leaderboard_table(highlight=None):
@@ -447,8 +424,8 @@ def run(args):
     if reproduced:
         print(f'  Reproduce     : {reproduced}')
 
-    print('\nGenerando split train/val/test (semilla fija)...')
-    train_imgs, val_imgs, test_imgs = data.generate_split(seed=args.seed)
+    print(f'\nGenerando split train/val/test (semilla: {config.SEED})...')
+    train_imgs, val_imgs, test_imgs = data.generate_split(seed=config.SEED)
 
     # Oversampling only repeats lines in train.txt; val and test are untouched.
     if args.oversample > 1:
@@ -470,7 +447,7 @@ def run(args):
             imgsz      = args.imgsz,
             batch      = args.batch,
             lr0        = args.lr0,
-            seed       = args.seed,
+            seed       = config.SEED,
             exist_ok   = False,
             **extra
         )
@@ -509,11 +486,6 @@ def run(args):
 
     totals = evaluate.summary(metrics)
 
-    # ---------------- leaderboard: metricas comparables ----------------
-    # Antes de rankear al nuevo contra los viejos, los viejos tienen que estar
-    # medidos sobre el mismo test set.
-    _refresh_old_metrics()
-
     # ---------------- registration ----------------
     print('\nDando de alta el modelo en el registro...')
     registered_before = _registered_names()
@@ -527,6 +499,18 @@ def run(args):
         origin       = model_name,
         notes        = args.notes or '',
     )
+
+    # ---------------- split snapshot ----------------
+    model_folder = models.model_dir(model_name)
+    if os.path.isdir(model_folder):
+        import shutil
+        for txt in (config.TRAIN_TXT, config.VAL_TXT, config.TEST_TXT):
+            if os.path.isfile(txt):
+                shutil.copy2(txt, model_folder)
+        seed_dst = os.path.join(model_folder, 'split_seed.txt')
+        with open(seed_dst, 'w') as f:
+            f.write(str(config.SEED))
+        print(f'  Split guardado en {model_folder} (semilla: {config.SEED})')
 
     # ---------------- leaderboard: como quedo la tabla ----------------
     _report_leaderboard(
@@ -585,7 +569,6 @@ def register(subparsers):
     p.add_argument('--lr0', type=float, default=None,
                    help=f'Learning rate (si se omite se pregunta; '
                         f'default {DEFAULTS["lr0"]})')
-    p.add_argument('--seed', type=int, default=config.SEED)
     p.add_argument('--oversample', type=_parse_oversample, default=None,
                    metavar='N',
                    help=f'Factor máximo de repetición de clases débiles; '

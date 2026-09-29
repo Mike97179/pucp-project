@@ -214,9 +214,18 @@ def _register_folder(folder, name_override=None):
 
     df = models._recompute_rank(df)
     df[models.CSV_COLUMNS].to_csv(config.MODELS_CSV, index=False)
-    models.save_fingerprint()
-
     print(f'  Registrado como "{model_name}"')
+
+    # Split snapshot
+    import shutil
+    target_folder = os.path.join(config.MODELS_DIR, model_name)
+    if os.path.isdir(target_folder):
+        for txt in (config.TRAIN_TXT, config.VAL_TXT, config.TEST_TXT):
+            if os.path.isfile(txt):
+                shutil.copy2(txt, target_folder)
+        with open(os.path.join(target_folder, 'split_seed.txt'), 'w') as f:
+            f.write(str(config.SEED))
+        print(f'  Split guardado en {target_folder} (semilla: {config.SEED})')
 
     final_path = models._enforce_leaderboard(
         model_name, os.path.join(folder, pt_target))
@@ -260,17 +269,6 @@ def run(args):
     print(f'Carpetas pendientes de registrar: {len(folders)}')
     for f in folders:
         print(f'  {os.path.basename(f)}/')
-
-    # Re-evaluate existing models once if the dataset changed
-    if os.path.isfile(config.MODELS_CSV) and models.needs_reevaluation():
-        print('\n' + '=' * 70)
-        print(' EL DATASET CAMBIÓ DESDE LA ÚLTIMA EVALUACIÓN')
-        print('=' * 70)
-        print(f'  Imágenes ahora: {models.dataset_fingerprint()}   '
-              f'(antes: {models.saved_fingerprint()})')
-        print('  Las métricas guardadas se midieron sobre otro test set.')
-        print('  Re-evaluando los modelos ya registrados...')
-        models.reevaluate_all(split='test')
 
     registered = 0
     for i, folder in enumerate(folders, 1):

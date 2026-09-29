@@ -12,6 +12,8 @@ problem: that is what the warning at the end is about.
 
 import os
 
+import cv2
+import numpy as np
 import pandas as pd
 
 from .. import config, data
@@ -68,10 +70,25 @@ def _class_table(images, class_names):
     return df
 
 
+def _split_images(split_txt):
+    """Unique image paths from a split file, resolved to full dataset paths."""
+    lines = _read_split(split_txt)
+    if lines is None:
+        return []
+    seen = set()
+    paths = []
+    for line in lines:
+        base = os.path.basename(line)
+        if base not in seen:
+            seen.add(base)
+            paths.append(os.path.join(config.IMG_DIR, base))
+    return paths
+
+
 def _split_distribution(images):
     """Images per split, warning when the split files are missing or stale."""
     print('\n' + '=' * 60)
-    print(' DISTRIBUCIÓN TRAIN / VAL / TEST')
+    print(f' DISTRIBUCIÓN TRAIN / VAL / TEST (semilla: {config.SEED})')
     print('=' * 60)
 
     missing = [name for name, txt in SPLITS if _read_split(txt) is None]
@@ -121,6 +138,59 @@ def _split_distribution(images):
               f'en benchmark.txt.')
         print('  El split se generó antes de añadirlas: '
               'regenéralo con `split`.')
+
+
+def show_class_per_split(class_names, from_split=False):
+    """Per-class instance counts broken down by split + benchmark."""
+    n = len(class_names)
+    all_splits = SPLITS + [('benchmark', config.BENCHMARK_TXT)]
+
+    missing = [name for name, txt in SPLITS if _read_split(txt) is None]
+    if missing:
+        return
+
+    split_counts = {}
+    for name, txt in all_splits:
+        imgs = _split_images(txt)
+        split_counts[name] = data.count_instances(imgs, n)
+
+    print('\n' + '=' * 60)
+    print(' INSTANCIAS POR CLASE Y SPLIT')
+    print('=' * 60)
+
+    header = f'{"clase":<18}'
+    for name, _ in all_splits:
+        header += f'{name:>10}'
+    header += f'{"total":>10}'
+    print(header)
+    print('-' * len(header))
+
+    warnings = []
+    for i, cls in enumerate(class_names):
+        row = f'{cls:<18}'
+        cls_total = 0
+        for name, _ in all_splits:
+            c = split_counts[name][i]
+            cls_total += c
+            row += f'{c:>10}'
+        row += f'{cls_total:>10}'
+        print(row)
+
+        test_count = split_counts['test'][i]
+        if cls_total > 0 and test_count == 0:
+            warnings.append(cls)
+
+    if warnings:
+        print(f'\n  AVISO: {", ".join(warnings)} no '
+              f'{"tiene" if len(warnings) == 1 else "tienen"} instancias en '
+              f'test.')
+        print('  El modelo no se puede evaluar en esa clase con este split.')
+        if from_split:
+            print('  Prueba con otra semilla: '
+                  '`python pucp_segmentation.py split --seed N`.')
+        else:
+            print('  Regenera el split con '
+                  '`python pucp_segmentation.py split`.')
 
 
 def _unannotated(images):
@@ -193,6 +263,109 @@ def _weak_classes(df):
         print('  de esas clases, o entrena con --oversample para repetirlas.')
 
 
+def _instances_per_image_excel(images, class_names):
+    """Write an Excel with per-image instance counts, saved in dataset/."""
+    n_classes = len(class_names)
+    rows = []
+    for img in images:
+        gt = data.read_ground_truth(img)
+        row = {'imagen': os.path.basename(img)}
+        for i, name in enumerate(class_names):
+            row[name] = gt.get(i, 0)
+        row['total'] = sum(gt.values())
+        rows.append(row)
+
+    df = pd.DataFrame(rows)
+    df = df.sort_values('imagen').reset_index(drop=True)
+
+    totals = {'imagen': 'TOTAL'}
+    for name in class_names:
+        totals[name] = df[name].sum()
+    totals['total'] = df['total'].sum()
+    df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
+
+    out_path = os.path.join(config.DATASET_PATH, 'instancias_por_imagen.xlsx')
+    df.to_excel(out_path, index=False)
+
+    print('\n' + '=' * 60)
+    print(' CONTEO DE INSTANCIAS POR IMAGEN')
+    print('=' * 60)
+    print(f'  Guardado en: {out_path}')
+    print(f'  {len(images)} imágenes, {len(class_names)} clases')
+
+
+def _draw_ground_truth(images, class_names, alpha=0.4):
+    """Draw segmentation masks from labels onto each image."""
+    output_dir = os.path.join(config.DATASET_PATH, 'ground_truth')
+    os.makedirs(output_dir, exist_ok=True)
+
+    colors = config.CLASS_COLORS_BGR
+
+    print('\n' + '=' * 60)
+    print(' VISUALIZACIÓN GROUND TRUTH')
+    print('=' * 60)
+
+    drawn = 0
+    for img_path in images:
+        lbl_path = data.label_path(img_path)
+        if not os.path.isfile(lbl_path):
+            continue
+
+        img = cv2.imread(img_path)
+        if img is None:
+            continue
+
+        h, w = img.shape[:2]
+        thickness = max(1, round((h + w) / 2 * 0.0015))
+        scale = max(0.3, (h + w) / 2 * 0.0005)
+
+        overlay = img.copy()
+        annotations = []
+
+        with open(lbl_path) as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) < 7:
+                    continue
+                cls_id = int(parts[0])
+                coords = list(map(float, parts[1:]))
+                xs = coords[0::2]
+                ys = coords[1::2]
+                pts = np.array(
+                    [[int(x * w), int(y * h)] for x, y in zip(xs, ys)],
+                    dtype=np.int32)
+                if len(pts) >= 3:
+                    cv2.fillPoly(overlay, [pts], colors[cls_id])
+                    annotations.append((cls_id, pts))
+
+        if not annotations:
+            continue
+
+        result = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+
+        for cls_id, pts in annotations:
+            color = colors[cls_id]
+            cv2.polylines(result, [pts], True, color, thickness, cv2.LINE_AA)
+
+            x_min, y_min = pts.min(axis=0)
+            label = class_names[cls_id]
+            (tw, th), baseline = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, scale, thickness)
+            y_label = max(y_min, th + 6)
+            cv2.rectangle(result, (x_min, y_label - th - baseline - 4),
+                          (x_min + tw + 6, y_label), color, -1, cv2.LINE_AA)
+            cv2.putText(result, label, (x_min + 3, y_label - baseline - 1),
+                        cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255),
+                        thickness, cv2.LINE_AA)
+
+        base = os.path.basename(img_path)
+        cv2.imwrite(os.path.join(output_dir, base), result)
+        drawn += 1
+
+    print(f'  Carpeta: {output_dir}')
+    print(f'  Imágenes generadas: {drawn}')
+
+
 def run(args):
     class_names = config.load_class_names()
     images      = data.list_images()
@@ -213,6 +386,8 @@ def run(args):
     _split_distribution(images)
     _unannotated(images)
     _weak_classes(df)
+    _instances_per_image_excel(images, class_names)
+    _draw_ground_truth(images, class_names)
     print()
 
 

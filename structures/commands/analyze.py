@@ -174,9 +174,17 @@ def run(args):
         print(f'  {os.path.basename(img)}')
 
     # Selección de modelo(s)
-    selection = models.ask(
-        args.models, multiple=True,
-        title='¿Con qué modelo(s) quieres analizar?')
+    if args.weights:
+        wpath = os.path.abspath(args.weights)
+        if not os.path.isfile(wpath):
+            print(f'\nNo se encontró: {wpath}')
+            return
+        wname = os.path.splitext(os.path.basename(wpath))[0]
+        selection = [{'name': wname, 'path': wpath}]
+    else:
+        selection = models.ask(
+            args.models, multiple=True,
+            title='¿Con qué modelo(s) quieres analizar?')
 
     print(f'\nModelos seleccionados: {len(selection)}')
     for model in selection:
@@ -284,8 +292,10 @@ def register(subparsers):
     p = subparsers.add_parser(
         'analyze',
         help='Analiza imágenes sueltas desde analyze/input/')
+    p.add_argument('--model', dest='weights', default=None,
+                   help='Ruta directa a un .pt (admite modelos archivados)')
     p.add_argument('--models', dest='models', nargs='+', default=None,
-                   help='Modelos a usar '
+                   help='Modelos del registro a usar '
                         '(si se omite, se pregunta listando los disponibles)')
     p.add_argument('--conf', type=float, default=0.25,
                    help='Umbral de confianza (default 0.25)')

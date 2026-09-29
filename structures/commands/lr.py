@@ -30,8 +30,8 @@ def run(args):
     print(f'Learning rates : {args.lrs}')
     print(f'Entrenamientos : {len(args.lrs)}   Épocas c/u: {args.epochs}')
 
-    print('\nGenerando split train/val/test (semilla fija)...')
-    data.generate_split(seed=args.seed)
+    print(f'\nGenerando split train/val/test (semilla: {config.SEED})...')
+    data.generate_split(seed=config.SEED)
 
     results = []
     for i, lr0 in enumerate(args.lrs, start=1):
@@ -46,7 +46,7 @@ def run(args):
             imgsz     = args.imgsz,
             batch     = args.batch,
             lr0       = lr0,
-            seed      = args.seed,
+            seed      = config.SEED,
         )
 
         metrics = evaluate.validate(weights, split='val')
@@ -88,6 +88,5 @@ def register(subparsers):
     p.add_argument('--epochs', type=int, default=50)
     p.add_argument('--imgsz', type=int, default=config.IMGSZ)
     p.add_argument('--batch', type=int, default=config.BATCH)
-    p.add_argument('--seed', type=int, default=config.SEED)
     p.set_defaults(func=run)
     return p

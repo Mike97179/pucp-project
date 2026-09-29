@@ -51,26 +51,10 @@ def _stored_order():
 
 
 def _print_dataset_state():
-    """Images in the dataset and whether the metrics are stale."""
-    current = models.dataset_fingerprint()
-    stored  = models.saved_fingerprint()
-
+    """Images in the dataset."""
+    from .. import data
+    current = len(data.list_images())
     print(f'\n  Dataset: {current} imágenes en {config.IMG_DIR}')
-
-    if models.needs_reevaluation():
-        print(f'  RE-EVALUACIÓN PENDIENTE: había {stored} imágenes cuando se '
-              f'midieron estas métricas.')
-        print('  Los mAP50 de arriba salen de un test set distinto al actual, '
-              'así que')
-        print('  el orden no es fiable. El próximo `entrenar` re-evalúa todo '
-              'antes de rankear.')
-    elif stored is None:
-        print('  Sin marca del dataset todavía: se escribe la primera vez que '
-              'se registre')
-        print('  o se re-evalúe un modelo.')
-    else:
-        print('  Métricas al día: el dataset no ha cambiado desde que se '
-              'midieron.')
 
 
 def run(args):
