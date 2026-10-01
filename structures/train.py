@@ -18,7 +18,11 @@ def check_environment():
     has_cuda = torch.cuda.is_available()
     print(f'CUDA disponible: {has_cuda}')
     if has_cuda:
-        print(f'GPU: {torch.cuda.get_device_name(0)}')
+        n = torch.cuda.device_count()
+        for i in range(n):
+            print(f'  GPU {i}: {torch.cuda.get_device_name(i)}')
+        if n > 1:
+            print(f'  Total: {n} GPUs disponibles')
     else:
         print('Sin GPU — funcionará igual pero será lento')
     return has_cuda
@@ -41,6 +45,7 @@ def train(run_name, runs_path,
           patience=config.PATIENCE,
           optimizer=config.OPTIMIZER,
           seed=config.SEED,
+          device=config.DEVICE,
           exist_ok=True,
           **extra):
     """
@@ -52,6 +57,7 @@ def train(run_name, runs_path,
     print(f'\n  modelo    : {base_model}')
     print(f'  épocas    : {epochs}   imgsz: {imgsz}   batch: {batch}')
     print(f'  optimizer : {optimizer}   lr0: {lr0}')
+    print(f'  device    : {device}')
     if extra:
         print(f'  extra     : {extra}')
 
@@ -67,7 +73,7 @@ def train(run_name, runs_path,
         lr0       = lr0,
         cos_lr    = config.COS_LR,
         seed      = seed,
-        device    = config.DEVICE,
+        device    = device,
         project   = runs_path,
         name      = run_name,
         exist_ok  = exist_ok,

@@ -39,8 +39,8 @@ LEADERBOARD_COLUMNS = ['rank', 'name', 'architecture', 'imgsz', 'data',
 
 # Menú del modo nuevo: opciones ofrecidas y valor que toma Enter. Son también
 # los valores que se usan cuando no hay terminal para preguntar.
-ARCHITECTURES  = ['yolov8n-seg.pt', 'yolov8s-seg.pt',
-                  'yolo11n-seg.pt', 'yolo11s-seg.pt']
+ARCHITECTURES  = ['yolov8n-seg.pt', 'yolov8s-seg.pt', 'yolov8m-seg.pt',
+                  'yolo11n-seg.pt', 'yolo11s-seg.pt', 'yolo11m-seg.pt']
 IMGSZ_CHOICES  = [640, 800]
 # El factor 1 es "no repetir nada". En el menú se ofrece como 'no' para que la
 # opción de no aplicarlo se vea, en vez de esconderse detrás de un 1.
@@ -70,7 +70,9 @@ OVERSAMPLE_PATTERN = re.compile(r'oversample_(\d+)x')
 
 ARCH_SHORT = {
     'yolov8n-seg.pt': 'yolo8n', 'yolov8s-seg.pt': 'yolo8s',
+    'yolov8m-seg.pt': 'yolo8m',
     'yolo11n-seg.pt': 'yolo11n', 'yolo11s-seg.pt': 'yolo11s',
+    'yolo11m-seg.pt': 'yolo11m',
 }
 ORIGIN_SHORT = {True: 'colab', False: 'local'}
 
@@ -140,6 +142,40 @@ def _format_batch(batch):
     return 'auto' if batch == AUTO_BATCH else batch
 
 
+def _parse_device(value):
+    """Parse a device string into what Ultralytics expects."""
+    if value is None:
+        return config.DEVICE
+    if str(value).lower() == 'todas':
+        import torch
+        n = torch.cuda.device_count()
+        return list(range(n)) if n > 1 else 0
+    parts = str(value).replace(' ', '').split(',')
+    ids = [int(p) for p in parts if p]
+    return ids if len(ids) > 1 else ids[0]
+
+
+def _gpu_choices():
+    """Build GPU menu choices from what's actually installed."""
+    import torch
+    n = torch.cuda.device_count()
+    if n == 0:
+        return [], 'cpu'
+    if n == 1:
+        return [0], 0
+    choices = list(range(n))
+    choices.append('todas')
+    return choices, 'todas'
+
+
+def _gpu_label(idx):
+    """Short name for a GPU, shown in the menu."""
+    import torch
+    if isinstance(idx, str):
+        return idx
+    return f'{idx}: {torch.cuda.get_device_name(idx)}'
+
+
 def _ask(question, choices, default, cast=None):
     """
     Ask for one hyperparameter, listing the choices, with Enter as default.
@@ -182,7 +218,7 @@ def _ask_missing(args):
     defaults are used.
     """
     pending = [field for field in ('model', 'imgsz', 'oversample', 'epochs',
-                                   'lr0', 'batch')
+                                   'lr0', 'batch', 'device')
                if getattr(args, field) is None]
 
     if not pending:
@@ -218,6 +254,19 @@ def _ask_missing(args):
         chosen = _ask('Batch       ', BATCH_CHOICES, DEFAULTS['batch'],
                       cast=int)
         args.batch = AUTO_BATCH if str(chosen).lower() == 'auto' else int(chosen)
+    if args.device is None:
+        gpu_choices, gpu_default = _gpu_choices()
+        if gpu_choices:
+            import torch
+            n = torch.cuda.device_count()
+            print()
+            for i in range(n):
+                print(f'    GPU {i}: {torch.cuda.get_device_name(i)}')
+            print()
+            chosen = _ask('GPU         ', gpu_choices, gpu_default, cast=int)
+            args.device = str(chosen)
+        else:
+            args.device = 'cpu'
 
 
 def _fill_defaults(args):
@@ -225,6 +274,9 @@ def _fill_defaults(args):
     for field, value in DEFAULTS.items():
         if getattr(args, field) is None:
             setattr(args, field, value)
+    if getattr(args, 'device', None) is None:
+        _, default = _gpu_choices()
+        args.device = str(default)
 
 
 def _best_model():
@@ -438,6 +490,8 @@ def run(args):
     if args.copy_paste:
         extra['copy_paste'] = args.copy_paste
 
+    device = _parse_device(args.device)
+
     try:
         weights = train.train(
             run_name   = run_name,
@@ -448,6 +502,7 @@ def run(args):
             batch      = args.batch,
             lr0        = args.lr0,
             seed       = config.SEED,
+            device     = device,
             exist_ok   = False,
             **extra
         )
@@ -583,6 +638,9 @@ def register(subparsers):
     p.add_argument('--reproduce', dest='reproduce', action='store_true',
                    help='Reentrena con la configuración del modelo rank 1 '
                         '(su args.yaml), útil al añadir imágenes nuevas')
+    p.add_argument('--device', dest='device', default=None,
+                   help='GPU(s) a usar: 0, "0,1", "0,1,2" '
+                        '(default: todas las disponibles)')
     p.add_argument('--output', dest='output', default=None,
                    help='Carpeta de salida (default: runs_final_N incremental)')
     p.set_defaults(func=run)
