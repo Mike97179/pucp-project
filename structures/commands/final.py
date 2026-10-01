@@ -541,7 +541,9 @@ def run(args):
             data.write_split(train_imgs, val_imgs, test_imgs)
 
     # ---------------- evaluation ----------------
-    metrics = evaluate.validate(weights, split='test', verbose=True)
+    eval_device = device if isinstance(device, int) else 0
+    metrics = evaluate.validate(weights, split='test', verbose=True,
+                                device=eval_device)
 
     print('\n' + '=' * 70)
     print(' MÉTRICAS POR CLASE (segmentación)')

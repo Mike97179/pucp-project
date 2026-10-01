@@ -14,10 +14,14 @@ from ultralytics import YOLO
 from . import config
 
 
-def validate(weights, split='test', verbose=False):
+def validate(weights, split='test', verbose=False, device=None):
     """Run model.val() and return the Ultralytics metrics object."""
+    free_memory()
     model = YOLO(weights)
-    return model.val(data=config.YAML_PATH, split=split, verbose=verbose)
+    kwargs = dict(data=config.YAML_PATH, split=split, verbose=verbose)
+    if device is not None:
+        kwargs['device'] = device
+    return model.val(**kwargs)
 
 
 def per_class_metrics(metrics, class_names, task='seg'):
