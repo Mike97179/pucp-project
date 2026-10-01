@@ -168,12 +168,39 @@ def _gpu_choices():
     return choices, 'todas'
 
 
-def _gpu_label(idx):
-    """Short name for a GPU, shown in the menu."""
-    import torch
-    if isinstance(idx, str):
-        return idx
-    return f'{idx}: {torch.cuda.get_device_name(idx)}'
+def _ask_gpu(n_gpus, default):
+    """Ask which GPU(s) to use, accepting single, comma-separated, or 'todas'."""
+    valid = set(range(n_gpus))
+    hint = ', '.join(str(i) for i in range(n_gpus))
+    prompt = f'  GPU          [{hint} / todas] (Enter = {default}): '
+
+    while True:
+        try:
+            answer = input(prompt).strip()
+        except EOFError:
+            raise KeyboardInterrupt
+
+        if not answer:
+            return default
+
+        if answer.lower() in ('todas', 'all', '*'):
+            return 'todas'
+
+        parts = answer.replace(' ', '').split(',')
+        try:
+            ids = [int(p) for p in parts if p]
+        except ValueError:
+            print(f'    Responde con números de GPU separados por coma, '
+                  f'o "todas"')
+            continue
+
+        if not ids or not all(i in valid for i in ids):
+            print(f'    GPU(s) válidas: {hint}')
+            continue
+
+        if len(ids) == 1:
+            return ids[0]
+        return ','.join(str(i) for i in ids)
 
 
 def _ask(question, choices, default, cast=None):
@@ -263,7 +290,7 @@ def _ask_missing(args):
             for i in range(n):
                 print(f'    GPU {i}: {torch.cuda.get_device_name(i)}')
             print()
-            chosen = _ask('GPU         ', gpu_choices, gpu_default, cast=int)
+            chosen = _ask_gpu(n, gpu_default)
             args.device = str(chosen)
         else:
             args.device = 'cpu'
